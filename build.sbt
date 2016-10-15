@@ -11,9 +11,7 @@ lazy val buildSettings = Seq(
 )
 
 lazy val server = (project in file ("server")).
-  enablePlugins(JavaServerAppPackaging).
-  enablePlugins(LinuxPlugin).
-  enablePlugins(SystemdPlugin).
+  enablePlugins(JavaServerAppPackaging,DebianPlugin,SystemVPlugin).
   settings(buildSettings: _*).
   settings(
     name := "zero-server",
@@ -34,6 +32,13 @@ lazy val server = (project in file ("server")).
       else
         Some("releases"  at nexus + "service/local/staging/deploy/maven2")
     }
+  ).
+  settings(
+    mainClass in Compile := Some("org.mellowtech.zero.server.Server"),
+    maintainer in Linux := "Martin Svensson <msvens@gmail.com>",
+    packageSummary in Linux := "Timer Service",
+    packageDescription in Linux := "This package installs a akka-http timer service that can be queired using a json api"//,
+    //serverLoading in Debian := ServerLoader.SystemV
   ).dependsOn(commons)
 
 lazy val client = (project in file ("client")).
