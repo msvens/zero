@@ -37,7 +37,8 @@ lazy val server = (project in file ("server")).
     mainClass in Compile := Some("org.mellowtech.zero.server.Server"),
     maintainer in Linux := "Martin Svensson <msvens@gmail.com>",
     packageSummary in Linux := "Timer Service",
-    packageDescription in Linux := "This package installs a akka-http timer service that can be queired using a json api"//,
+    packageDescription in Linux := "This package installs a akka-http timer service that can be queired using a json api",
+    daemonUser in Linux := "www-data"
     //serverLoading in Debian := ServerLoader.SystemV
   ).dependsOn(commons)
 
