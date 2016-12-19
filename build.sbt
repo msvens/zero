@@ -3,9 +3,9 @@ import sbt.Keys._
 import sbt._
 
 lazy val buildSettings = Seq(
-  version := "0.1-SNAPSHOT",
+  version := "0.2-SNAPSHOT",
   organization := "org.mellowtech",
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.12.1",
   publishArtifact in Test := false,
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/site/test-reports")
 )
@@ -16,11 +16,11 @@ lazy val server = (project in file ("server")).
   settings(
     name := "zero-server",
     libraryDependencies ++= jsonDeps ++ testDeps ++ Seq(
-      "com.typesafe.slick" %% "slick" % "3.1.1",
+      "com.typesafe.slick" %% "slick" % "3.2.0-M2",
       "org.postgresql" % "postgresql" % "9.4-1206-jdbc41",
       "com.zaxxer" % "HikariCP" % "2.4.7",
-      "de.heikoseeberger" %% "akka-http-json4s" % "1.10.1",
-      "com.typesafe.akka" % "akka-slf4j_2.11" % "2.4.11",
+      "de.heikoseeberger" %% "akka-http-json4s" % "1.11.0",
+      "com.typesafe.akka" % "akka-slf4j_2.12" % "2.4.14",
       "ch.qos.logback" % "logback-classic" % "1.1.7"
     ),
     publishMavenStyle := true,
@@ -66,7 +66,7 @@ lazy val commons = (project in file ("commons")).
   settings(
     name := "zero-commons",
     libraryDependencies ++= testDeps ++ jsonDeps ++ Seq(
-      "org.mellowtech" %% "jsonclient" % "0.1-SNAPSHOT"
+      "org.mellowtech" %% "jsonclient" % "0.2-SNAPSHOT"
     ),
     publishMavenStyle := true,
     pomIncludeRepository := { _ => false },
