@@ -16,47 +16,47 @@ class Client(url: String)(implicit val ec: ExecutionContext) {
 
   def list: Future[List[Timer]] = for(
     jcresp <- jc.get[ApiResponse[List[Timer]]](url+"/timers")
-    if jcresp.statusCode == 200
+    if jcresp.status == 200
   ) yield jcresp.body.get.value.get
 
   def add(ad: AddTimer): Future[Timer] = for(
     r <- jc.post[ApiResponse[Timer],AddTimer](url+"/timers",ad)
-    if r.statusCode == 200
+    if r.status == 200
   ) yield r.body.get.value.get
 
   def get(id: Int): Future[Timer] = for(
     r <- jc.get[ApiResponse[Timer]](url+"/timers/"+id)
-    if r.statusCode == 200
+    if r.status == 200
   ) yield r.body.get.value.get
 
   def elapsed(id: Int): Future[Counter] = for (
     r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/elapsed")
-    if r.statusCode == 200
+    if r.status == 200
   ) yield r.body.get.value.get
 
   def elapsedDays(id: Int): Future[Counter] = for (
     r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/elapsed/days")
-    if r.statusCode == 200
+    if r.status == 200
   ) yield r.body.get.value.get
 
   def elapsedSeconds(id: Int): Future[Counter] = for (
     r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/elapsed/seconds")
-    if r.statusCode == 200
+    if r.status == 200
   ) yield r.body.get.value.get
 
   def remaining(id: Int): Future[Counter] = for (
     r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/remaining")
-    if r.statusCode == 200
+    if r.status == 200
   ) yield r.body.get.value.get
 
   def remainingDays(id: Int): Future[Counter] = for (
     r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/remaining/days")
-    if r.statusCode == 200
+    if r.status == 200
   ) yield r.body.get.value.get
 
   def remainingSeconds(id: Int): Future[Counter] = for (
     r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/remaining/seconds")
-    if r.statusCode == 200
+    if r.status == 200
   ) yield r.body.get.value.get
 
 

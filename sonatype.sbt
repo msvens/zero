@@ -1,9 +1,6 @@
 // Your profile name of the sonatype account. The default is the same with the organization value
 sonatypeProfileName := "org.mellowtech"
 
-//useGpg := true
-//pgpPassphrase := Some(Array('1','9','K','a','o','s','7','3','.'))
-
 // To sync with Maven central, you need to supply the following information:
 pomExtra in Global := {
   <url>https://github.com/msvens/zero</url>

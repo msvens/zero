@@ -66,7 +66,7 @@ lazy val commons = (project in file ("commons")).
   settings(
     name := "zero-commons",
     libraryDependencies ++= testDeps ++ jsonDeps ++ Seq(
-      "org.mellowtech" %% "jsonclient" % "0.2-SNAPSHOT"
+      "org.mellowtech" %% "jsonclient" % "0.3.2-SNAPSHOT"
     ),
     publishMavenStyle := true,
     pomIncludeRepository := { _ => false },

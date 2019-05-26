@@ -6,6 +6,7 @@ import org.mellowtech.zero.model.{AddTimer, Counter}
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.{Failure, Success}
 
 case class TConfig(cmd: String = "", url: String = "", title: Option[String] = None, id: Int = -1, fmt: String = "f", seconds: Option[Int] = None)
 
@@ -63,12 +64,19 @@ object TimeCmd extends App {
       val c = Client(config.url)
       config.cmd match {
         case "list" => {
-          val l = Await.result(c.list, 2 seconds)
-          println(l mkString "\n")
+          val tl = Await.ready(c.list, 2 seconds).value.get
+          tl match {
+            case Success(l) => println(l mkString "\n")
+            case Failure(f) => println(f)
+          }
+          //println(l mkString "\n")
         }
         case "get" => {
-          val t = Await.result(c.get(config.id), 2 seconds)
-          println(t)
+          val tt = Await.ready(c.get(config.id), 2 seconds).value.get
+          tt match {
+            case Success(t) => println(t)
+            case Failure(f) => println(f)
+          }
         }
         case "add" => {
           val a = AddTimer(title = config.title.get, seconds = config.seconds)

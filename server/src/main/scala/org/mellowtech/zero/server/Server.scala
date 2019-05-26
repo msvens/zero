@@ -6,7 +6,7 @@ import java.time.temporal.ChronoUnit
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.server.{Directives, Route}
 import akka.stream.{ActorMaterializer, Materializer}
 import org.json4s.native
 import org.mellowtech.zero.model.SuccessFailure._
@@ -35,16 +35,16 @@ object Server extends Config {
     Http().bindAndHandle(route, httpHost, httpPort)
   }
 
-  def route(implicit m: Materializer) = {
+  def route(implicit m: Materializer): Route = {
     val dbService = new DbService(jdbcUrl, dbUser, dbPassword)
     val timerDAO = new TimerDAO(dbService)
 
     import Directives._
     import de.heikoseeberger.akkahttpjson4s.Json4sSupport._
 
+    implicit val formats = Implicits.formats
     implicit val serialization = native.Serialization
     // or native.Serialization
-    implicit val formats = Implicits.formats
 
     pathPrefix("timers") {
       log.debug("found timers path...")
