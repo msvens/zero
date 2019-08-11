@@ -1,6 +1,7 @@
 package org.mellowtech.zero.client
 
 import java.net.URI
+import java.time.OffsetDateTime
 
 import org.mellowtech.zero.model.{AddTimer, Counter}
 
@@ -8,7 +9,7 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-case class TConfig(cmd: String = "", url: String = "", title: Option[String] = None, id: Int = -1, fmt: String = "f", seconds: Option[Int] = None)
+case class TConfig(cmd: String = "", url: String = "", title: Option[String] = None, id: Int = -1, fmt: String = "f", millis: Option[Long] = None)
 
 /**
   * @author msvens
@@ -30,8 +31,8 @@ object TimeCmd extends App {
     cmd("add").action((_,tc) => tc.copy(cmd = "add")).text("add new timer").children(
       opt[String]("title").abbr("t").required().action( (x, tc) =>
         tc.copy(title = Some(x)) ).text("title of the new timer"),
-      opt[Int]("seconds").abbr("s").action( (s, tc) =>
-        tc.copy(seconds = Some(s)) ).text("elapsed seconds")
+      opt[Int]("millis").abbr("s").action( (s, tc) =>
+        tc.copy(millis = Some(s)) ).text("elapsed millis")
     )
     cmd("get").action((_,tc) => tc.copy(cmd = "get")).text("get timer").children(
       opt[Int]('i',"timerId").required().action((i,tc) =>
@@ -60,56 +61,47 @@ object TimeCmd extends App {
 
 
   parser.parse(args, TConfig()) match {
-    case Some(config) => {
+    case Some(config) =>
       val c = Client(config.url)
       config.cmd match {
-        case "list" => {
-          val tl = Await.ready(c.list, 2 seconds).value.get
+        case "list" =>
+          val tl = Await.ready(c.list, 2.seconds).value.get
           tl match {
             case Success(l) => println(l mkString "\n")
             case Failure(f) => println(f)
           }
-          //println(l mkString "\n")
-        }
-        case "get" => {
-          val tt = Await.ready(c.get(config.id), 2 seconds).value.get
+        case "get" =>
+          val tt = Await.ready(c.get(config.id), 2.seconds).value.get
           tt match {
             case Success(t) => println(t)
             case Failure(f) => println(f)
           }
-        }
-        case "add" => {
-          val a = AddTimer(title = config.title.get, seconds = config.seconds)
-          val t = Await.result(c.add(a), 2 seconds)
+        case "add" =>
+          val a = AddTimer(title = config.title.get, start = Some(OffsetDateTime.now()), millis = config.millis)
+          val t = Await.result(c.add(a), 2.seconds)
           println(t)
-        }
-        case "elapsed" => {
+        case "elapsed" =>
           val id = config.id
           val counter: Counter = config.fmt match {
-            case "s" => Await.result(c.elapsedSeconds(id), 2 seconds)
-            case "d" => Await.result(c.elapsedDays(id), 2 seconds)
-            case _ => Await.result(c.elapsed(id), 2 seconds)
+            case "s" => Await.result(c.elapsedSeconds(id), 2.seconds)
+            case "d" => Await.result(c.elapsedDays(id), 2.seconds)
+            case _ => Await.result(c.elapsed(id), 2.seconds)
           }
           println(counter)
-        }
-        case "remaining" => {
+        case "remaining" =>
           val id = config.id
           val counter: Counter = config.fmt match {
-            case "s" => Await.result(c.remainingSeconds(id), 2 seconds)
-            case "d" => Await.result(c.remainingDays(id), 2 seconds)
-            case _ => Await.result(c.remaining(id), 2 seconds)
+            case "s" => Await.result(c.remainingSeconds(id), 2.seconds)
+            case "d" => Await.result(c.remainingDays(id), 2.seconds)
+            case _ => Await.result(c.remaining(id), 2.seconds)
           }
           println(counter)
-        }
-        case _ => {
+        case _ =>
           println("command: "+config.cmd+" not yet implemented")
-        }
       }
       c.close
-    }
-    case None => {
+    case None =>
       println("not valid config")
-    }
   }
 
   sys.exit(0)

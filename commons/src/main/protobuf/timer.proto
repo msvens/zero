@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "org.mellowtech.zero.grpc";
+option java_outer_classname = "ZeroProto";
+
+package zero;
+
+service ZeroService {
+
+
+    rpc CreateTimer (ZNewTimer) returns (ZTimer) {}
+    rpc GetTimer (ZTimerRequest) returns (ZTimerResponse) {}
+    rpc GetCounter (ZCounterRequest) returns (ZCounter) {}
+    rpc ListTimers (ZSearchRequest) returns (ZTimerResponse) {}
+
+
+}
+
+enum ZCounters {
+    FULL = 0;
+    YEARS = 1;
+    MONTHS = 2;
+    DAYS = 3;
+    HOURS = 4;
+    MINUTES = 5;
+    SECONDS = 6;
+    MILLIS = 7;
+}
+
+message ZSearchRequest {}
+
+message ZTimerRequest {
+    oneof critera {
+        string uuid = 1;
+        string title = 2;
+        string desc = 3;
+    }
+}
+
+message ZTimerResponse {
+    repeated ZTimer timer = 1;
+}
+
+message ZTimer {
+    string uuid = 1;
+    string title = 2;
+    string start = 3; //ISO-8601 extended offset date-time format
+    string stop = 4; //ISO-8601 extended offset date-time format
+    string desc = 5;
+}
+
+message ZNewTimer {
+    string title = 1;
+    string start = 2; //ISO-8601 extended offset date-time format
+    string stop = 3; //ISO-8601 extended offset date-time format
+    int64 millis = 4;
+    string desc = 5;
+}
+
+message ZCounterRequest {
+    string uuid = 1;
+    bool remaining = 2;
+    ZCounters counters = 3;
+}
+
+message ZCounter {
+    int64 years = 1;
+    int64 months = 2;
+    int64 days = 3;
+    int64 hours = 4;
+    int64 minutes = 5;
+    int64 seconds = 6;
+    int64 millis = 7;
+}
+
+
+
+
+

@@ -1,10 +1,10 @@
 package org.mellowtech.zero.server
 
-import java.sql.Timestamp
-import java.time.{OffsetDateTime, ZoneOffset}
+import java.time.temporal.{ChronoUnit}
+import java.time.{Instant, LocalDateTime, OffsetDateTime, ZoneId, ZoneOffset}
+import java.util.UUID
 
 import org.mellowtech.zero.model.Timer
-import slick.driver.JdbcProfile
 
 import scala.concurrent.Future
 
@@ -13,54 +13,49 @@ import scala.concurrent.Future
   * @since 01/10/16
   */
 
-/*trait UserEntityTable {
-
-  protected val databaseService: DatabaseService
-  import databaseService.driver.api._
-
-  class Users(tag: Tag) extends Table[UserEntity](tag, "users") {
-    def id = column[Option[Long]]("id", O.PrimaryKey, O.AutoInc)
-    def username = column[String]("username")
-    def password = column[String]("password")
-
-    def * = (id, username, password) <> ((UserEntity.apply _).tupled, UserEntity.unapply)
-  }
-
-  protected val users = TableQuery[Users]
-
-}*/
-
 class TimerDAO(protected val dbService: DbService){
 
 
   import dbService.driver.api._
 
-  class TimerTable(tag: Tag) extends Table[Timer](tag, "timer"){
+  class TimerTable(tag: Tag) extends Table[Timer](tag, "ztimer"){
 
-    implicit val OffsetDateTimeToTimestamp = MappedColumnType.base[OffsetDateTime, Timestamp](
-      l => Timestamp.from(l.toInstant),
-      t => OffsetDateTime.ofInstant(t.toInstant, ZoneOffset.UTC)
+    implicit val ZoneIdToString = MappedColumnType.base[ZoneOffset, String](
+      zoneId => zoneId.getId(),
+      zoneString => ZoneOffset.of(zoneString)
     )
 
-    def id = column[Option[Int]]("id", O.PrimaryKey, O.AutoInc)
+    def id = column[UUID]("id", O.PrimaryKey, O.AutoInc)
     def title = column[String]("title")
-    def start = column[Option[OffsetDateTime]]("start")
-    def stop = column[Option[OffsetDateTime]]("stop")
-    def desc = column[Option[String]]("description")
-    def * = (id,title,start,stop,desc) <> (Timer.tupled, Timer.unapply _)
+    def start = column[OffsetDateTime]("start")
+    def stop = column[OffsetDateTime]("stop")
+    def description = column[Option[String]]("description")
+    def * = (id.?, title, start, stop, description) <> (Timer.tupled, Timer.unapply)
   }
 
   private val timers = TableQuery[TimerTable]
 
-  def insert(t: Timer): Future[Option[Int]] = dbService.db.run(timers returning timers.map(_.id) += t)
 
-  def get(id: Int): Future[Option[Timer]] = {
+  def insert(title: String, start: OffsetDateTime, stop: Either[OffsetDateTime, Long],
+             description: Option[String] = None): Future[UUID] = {
+    val end = stop match {
+      case Left(x) => x
+      case Right(x) => start.plus(x, ChronoUnit.MILLIS)
+    }
+    require(end.isAfter(start))
+    require(end.getOffset == start.getOffset)
+    insert(Timer(None, title, start, end, description))
+  }
+
+  def insert(t: Timer): Future[UUID] = dbService.db.run(timers returning timers.map(_.id) += t)
+
+  def get(id: UUID): Future[Option[Timer]] = {
     val q = timers.filter(_.id === id)
     dbService.db.run(q.result.headOption)
   }
 
-  def get(t: String): Future[Option[Timer]] = {
-    val q = timers.filter(_.title === t)
+  def get(title: String): Future[Option[Timer]] = {
+    val q = timers.filter(_.title === title)
     dbService.db.run(q.result.headOption)
   }
 

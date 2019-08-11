@@ -1,50 +1,58 @@
 package org.mellowtech.zero.server
 
-import java.time.OffsetDateTime
-import java.time.temporal.ChronoUnit
 
-import akka.actor.ActorSystem
+import java.time.OffsetDateTime
+
+import akka.actor.{ActorSystem, Terminated}
 import akka.event.{Logging, LoggingAdapter}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.stream.{ActorMaterializer, Materializer}
-import org.json4s.native
 import org.mellowtech.zero.model.SuccessFailure._
-import org.mellowtech.zero.model.{AddTimer, ApiResponse, Counter, Timer}
-import org.mellowtech.zero.util.Implicits
+import org.mellowtech.zero.model._
+import org.mellowtech.zero.util.TimerFuncs.{elapsedFull, elapsedSeconds, elapsedToDays, remainingFull, remainingSeconds, remainingToDays, utcNow}
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.io.StdIn
 
 /**
   * @author msvens
   * @since 01/10/16
   */
-object Server extends Config {
 
-  import org.mellowtech.zero.util.TimerFuncs._
+class ZeroServer()(implicit actorSystem: ActorSystem, materializer: ActorMaterializer) extends Config{
 
-  implicit val actorSystem = ActorSystem()
   implicit val executor: ExecutionContext = actorSystem.dispatcher
   implicit val log: LoggingAdapter = Logging(actorSystem, getClass)
-  implicit val materializer: ActorMaterializer = ActorMaterializer()
-  //implicit val formats =
-  //implicit val jsonStreamingSupport: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
-  def main(args: Array[String]): Unit = {
+  //setup database
+  val dbService = new DbService()
+  val timerDAO = new TimerDAO(dbService)
 
-    Http().bindAndHandle(route, httpHost, httpPort)
+  val binding = Http().bindAndHandle(route, httpHost, httpPort)
+
+  // report successful binding
+  binding.foreach { binding =>
+    println(s"server bound to: ${binding.localAddress}")
+  }
+
+
+
+  def shutdown(): Future[Terminated] ={
+    import scala.concurrent.duration._
+
+    Await.result(binding, 10.seconds)
+      .terminate(hardDeadline = 3.seconds).flatMap(_ => {
+      //dbService.dataSource.close
+      actorSystem.terminate()
+    })
   }
 
   def route(implicit m: Materializer): Route = {
-    val dbService = new DbService(jdbcUrl, dbUser, dbPassword)
-    val timerDAO = new TimerDAO(dbService)
 
     import Directives._
-    import de.heikoseeberger.akkahttpjson4s.Json4sSupport._
-
-    implicit val formats = Implicits.formats
-    implicit val serialization = native.Serialization
-    // or native.Serialization
+    import org.mellowtech.zero.model.JsonCodecs._
+    import de.heikoseeberger.akkahttpjsoniterscala.JsoniterScalaSupport._
 
     pathPrefix("timers") {
       log.debug("found timers path...")
@@ -52,39 +60,36 @@ object Server extends Config {
         get {
           log.debug("list timers")
           onSuccess(timerDAO.list) {
-            tt => complete(ApiResponse(SUCCESS, Some("listTimers"), Some(tt)))
+            tt => complete(TimersResponse(SUCCESS, Some("listTimers"), Some(tt)))
           }
         } ~
           post {
             log.debug("post timer")
             entity(as[AddTimer]) { at =>
-              val start = at.start.getOrElse(OffsetDateTime.now())
-              val stop = if (at.seconds.isDefined) {
-                start.plus(at.seconds.get, ChronoUnit.SECONDS)
-              } else {
-                at.stop.getOrElse(start.plusYears(1))
+              val end: Either[OffsetDateTime, Long] = at.stop match {
+                case Some(odt) => Left(odt)
+                case None => Right(at.millis.getOrElse(1000*3600*24))
               }
-              val t = Timer(None, at.title, Some(start), Some(stop), at.desc)
               val f = for {
-                id <- timerDAO.insert(t)
-                tt <- timerDAO.get(id.get)
-              } yield ApiResponse(SUCCESS, Some("addTimers"), Some(tt))
+                id <- timerDAO.insert(at.title, at.start.getOrElse(utcNow), end, at.desc)
+                tt <- timerDAO.get(id)
+              } yield TimerResponse(SUCCESS, Some("addTimers"), tt)
               onSuccess(f) {
                 ft => complete(ft)
               }
             }
           }
       } ~
-        pathPrefix(IntNumber) { id =>
+        pathPrefix(JavaUUID) { id =>
           pathEndOrSingleSlash {
             log.debug("get timer")
             get {
               onSuccess(timerDAO.get(id)) {
-                case Some(timer) => {
+                case Some(timer) =>
                   log.debug("successfully received timer")
-                  complete(ApiResponse[Timer](SUCCESS, Some("getTimer"), Some(timer)))
-                }
-                case None => complete(ApiResponse[Timer](ERROR, Some("getTimer"), None))
+                  complete(TimerResponse(SUCCESS, Some("getTimer"), Some(timer)))
+
+                case None => complete(TimerResponse(ERROR, Some("getTimer"), None))
               }
             }
           } ~
@@ -92,24 +97,24 @@ object Server extends Config {
               pathEndOrSingleSlash {
                 get {
                   onSuccess(timerDAO.get(id)) {
-                    case Some(timer) => complete(ApiResponse[Counter](SUCCESS, Some("elapsedFull"), Some(elapsedFull(timer))))
-                    case None => complete(ApiResponse[Counter](ERROR, Some("elapsedFull"), None))
+                    case Some(timer) => complete(CounterResponse(SUCCESS, Some("elapsedFull"), Some(elapsedFull(timer))))
+                    case None => complete(CounterResponse(ERROR, Some("elapsedFull"), None))
                   }
                 }
               } ~
                 pathSuffix("days") {
                   get {
                     onSuccess(timerDAO.get(id)) {
-                      case Some(timer) => complete(ApiResponse[Counter](SUCCESS, Some("elapsedDays"), Some(elapsedToDays(timer))))
-                      case None => complete(ApiResponse[Counter](ERROR, Some("elapsedDays"), None))
+                      case Some(timer) => complete(CounterResponse(SUCCESS, Some("elapsedDays"), Some(elapsedToDays(timer))))
+                      case None => complete(CounterResponse(ERROR, Some("elapsedDays"), None))
                     }
                   }
                 } ~
                 pathSuffix("seconds") {
                   get {
                     onSuccess(timerDAO.get(id)) {
-                      case Some(timer) => complete(ApiResponse[Counter](SUCCESS, Some("elapsedSeconds"), Some(elapsedSeconds(timer))))
-                      case None => complete(ApiResponse[Counter](ERROR, Some("elapsedSeconds"), None))
+                      case Some(timer) => complete(CounterResponse(SUCCESS, Some("elapsedSeconds"), Some(elapsedSeconds(timer))))
+                      case None => complete(CounterResponse(ERROR, Some("elapsedSeconds"), None))
                     }
                   }
                 }
@@ -118,24 +123,24 @@ object Server extends Config {
               pathEndOrSingleSlash {
                 get {
                   onSuccess(timerDAO.get(id)) {
-                    case Some(timer) => complete(ApiResponse[Counter](SUCCESS, Some("remainingFull"), Some(remainingFull(timer))))
-                    case None => complete(ApiResponse[Counter](ERROR, Some("remainingFull"), None))
+                    case Some(timer) => complete(CounterResponse(SUCCESS, Some("remainingFull"), Some(remainingFull(timer))))
+                    case None => complete(CounterResponse(ERROR, Some("remainingFull"), None))
                   }
                 }
               } ~
                 pathSuffix("days") {
                   get {
                     onSuccess(timerDAO.get(id)) {
-                      case Some(timer) => complete(ApiResponse[Counter](SUCCESS, Some("remainingDays"), Some(remainingToDays(timer))))
-                      case None => complete(ApiResponse[Counter](ERROR, Some("remainingDays"), None))
+                      case Some(timer) => complete(CounterResponse(SUCCESS, Some("remainingDays"), Some(remainingToDays(timer))))
+                      case None => complete(CounterResponse(ERROR, Some("remainingDays"), None))
                     }
                   }
                 } ~
                 pathSuffix("seconds") {
                   get {
                     onSuccess(timerDAO.get(id)) {
-                      case Some(timer) => complete(ApiResponse[Counter](SUCCESS, Some("remainingSeconds"), Some(remainingSeconds(timer))))
-                      case None => complete(ApiResponse[Counter](ERROR, Some("remainingSeconds"), None))
+                      case Some(timer) => complete(CounterResponse(SUCCESS, Some("remainingSeconds"), Some(remainingSeconds(timer))))
+                      case None => complete(CounterResponse(ERROR, Some("remainingSeconds"), None))
                     }
                   }
                 }
@@ -144,4 +149,21 @@ object Server extends Config {
     }
   }
 
+}
+
+object ZeroServer {
+
+  def apply(): ZeroServer = {
+    implicit val actorSystem: ActorSystem = ActorSystem()
+    implicit val materializer: ActorMaterializer = ActorMaterializer()
+    new ZeroServer()
+  }
+
+}
+
+object Server extends App {
+
+  val server = ZeroServer()
+  StdIn.readLine()
+  server.shutdown()
 }

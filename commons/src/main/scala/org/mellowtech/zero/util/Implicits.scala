@@ -2,10 +2,12 @@ package org.mellowtech.zero.util
 
 import java.time.OffsetDateTime
 
+/*
 import org.json4s.CustomSerializer
 import org.json4s.JsonAST.{JNull, JString}
+*/
 
-
+/*
 case object OffsetDateTimeSerializer extends CustomSerializer[OffsetDateTime](format => (
   {
     case JString(t) => OffsetDateTime.parse(t)
@@ -19,3 +21,4 @@ case object OffsetDateTimeSerializer extends CustomSerializer[OffsetDateTime](fo
 object Implicits {
   implicit val formats = org.json4s.DefaultFormats + OffsetDateTimeSerializer
 }
+*/

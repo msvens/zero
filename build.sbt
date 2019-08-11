@@ -5,7 +5,7 @@ import sbt._
 lazy val buildSettings = Seq(
   version := "0.2-SNAPSHOT",
   organization := "org.mellowtech",
-  scalaVersion := "2.12.1",
+  scalaVersion := "2.13.0",
   publishArtifact in Test := false,
   testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/site/test-reports")
 )
@@ -15,14 +15,7 @@ lazy val server = (project in file ("server")).
   settings(buildSettings: _*).
   settings(
     name := "zero-server",
-    libraryDependencies ++= jsonDeps ++ testDeps ++ Seq(
-      "com.typesafe.slick" %% "slick" % "3.2.0-M2",
-      "org.postgresql" % "postgresql" % "9.4-1206-jdbc41",
-      "com.zaxxer" % "HikariCP" % "2.4.7",
-      "de.heikoseeberger" %% "akka-http-json4s" % "1.11.0",
-      "com.typesafe.akka" % "akka-slf4j_2.12" % "2.4.14",
-      "ch.qos.logback" % "logback-classic" % "1.1.7"
-    ),
+    libraryDependencies ++= serverDependcies,
     publishMavenStyle := true,
     pomIncludeRepository := { _ => false },
     publishTo := {
@@ -34,10 +27,11 @@ lazy val server = (project in file ("server")).
     }
   ).
   settings(
-    mainClass in Compile := Some("org.mellowtech.zero.server.Server"),
+    //javaAgents += "org.mortbay.jetty.alpn" % "jetty-alpn-agent" % "2.0.9" % "runtime;test",
+    mainClass in Compile := Some("org.mellowtech.zero.server.ZeroGrpcServer"),
     maintainer in Linux := "Martin Svensson <msvens@gmail.com>",
     packageSummary in Linux := "Timer Service",
-    packageDescription in Linux := "This package installs a akka-http timer service that can be queired using a json api",
+    packageDescription in Linux := "This package installs a akka-http timer service that can be queired using a grpc api",
     daemonUser in Linux := "www-data"
     //serverLoading in Debian := ServerLoader.SystemV
   ).dependsOn(commons)
@@ -46,12 +40,9 @@ lazy val client = (project in file ("client")).
   settings(buildSettings: _*).
   settings(
     name := "zero-client",
-    libraryDependencies ++= jsonDeps ++ testDeps ++ Seq(
-      "com.github.scopt" %% "scopt" % "3.5.0"
-    ),
+    libraryDependencies ++= clientDependcies,
     publishMavenStyle := true,
     pomIncludeRepository := { _ => false },
-    //assemblyJarName in assembly := "timer.jar",
     publishTo := {
       val nexus = "https://oss.sonatype.org/"
       if (isSnapshot.value)
@@ -62,12 +53,11 @@ lazy val client = (project in file ("client")).
   ).dependsOn(commons)
 
 lazy val commons = (project in file ("commons")).
+  enablePlugins(AkkaGrpcPlugin).
   settings(buildSettings: _*).
   settings(
     name := "zero-commons",
-    libraryDependencies ++= testDeps ++ jsonDeps ++ Seq(
-      "org.mellowtech" %% "jsonclient" % "0.3.2-SNAPSHOT"
-    ),
+    libraryDependencies ++= commonsDependcies,
     publishMavenStyle := true,
     pomIncludeRepository := { _ => false },
     publishTo := {

@@ -11,10 +11,11 @@ trait Config {
   private val httpConfig = config.getConfig("http")
   private val databaseConfig = config.getConfig("database")
 
+  val dbConfig = config.getConfig("db")
   val httpHost = httpConfig.getString("interface")
   val httpPort = httpConfig.getInt("port")
 
-  val jdbcUrl = databaseConfig.getString("url")
+  /*val jdbcUrl = databaseConfig.getString("url")
   val dbUser = databaseConfig.getString("user")
-  val dbPassword = databaseConfig.getString("password")
+  val dbPassword = databaseConfig.getString("password")*/
 }

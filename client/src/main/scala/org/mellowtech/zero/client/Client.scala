@@ -1,7 +1,9 @@
 package org.mellowtech.zero.client
 
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
 import org.mellowtech.jsonclient.JsonClient
-import org.mellowtech.zero.model.{AddTimer, ApiResponse, Counter, Timer}
+import org.mellowtech.zero.model.{AddTimer, Counter, CounterResponse, Timer, TimerResponse, TimersResponse}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -9,55 +11,60 @@ import scala.concurrent.{ExecutionContext, Future}
   * @author msvens
   * @since 01/10/16
   */
-class Client(url: String)(implicit val ec: ExecutionContext) {
+class Client(var url: String)(implicit val ec: ExecutionContext) {
 
-  import org.mellowtech.zero.util.Implicits.formats
+  import org.mellowtech.zero.model.JsonCodecs._
+
+  implicit val as: ActorSystem = ActorSystem()
+  implicit val materializer = ActorMaterializer()
+
   val jc = JsonClient()
 
-  def list: Future[List[Timer]] = for(
-    jcresp <- jc.get[ApiResponse[List[Timer]]](url+"/timers")
-    if jcresp.status == 200
-  ) yield jcresp.body.get.value.get
+
+  def list: Future[Seq[Timer]] = for(
+    r <- jc.get[TimersResponse](url+"/timers")
+    if r.status == 200
+  ) yield r.body.value.get
 
   def add(ad: AddTimer): Future[Timer] = for(
-    r <- jc.post[ApiResponse[Timer],AddTimer](url+"/timers",ad)
+    r <- jc.post[TimerResponse,AddTimer](url+"/timers",ad)
     if r.status == 200
-  ) yield r.body.get.value.get
+  ) yield r.body.value.get
 
   def get(id: Int): Future[Timer] = for(
-    r <- jc.get[ApiResponse[Timer]](url+"/timers/"+id)
+    r <- jc.get[TimerResponse](url+"/timers/"+id)
     if r.status == 200
-  ) yield r.body.get.value.get
+  ) yield r.body.value.get
 
   def elapsed(id: Int): Future[Counter] = for (
-    r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/elapsed")
+    r <- jc.get[CounterResponse](url+"/timers/"+id+"/elapsed")
     if r.status == 200
-  ) yield r.body.get.value.get
+  ) yield r.body.value.get
 
   def elapsedDays(id: Int): Future[Counter] = for (
-    r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/elapsed/days")
+    r <- jc.get[CounterResponse](url+"/timers/"+id+"/elapsed/days")
     if r.status == 200
-  ) yield r.body.get.value.get
+  ) yield r.body.value.get
 
   def elapsedSeconds(id: Int): Future[Counter] = for (
-    r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/elapsed/seconds")
+    r <- jc.get[CounterResponse](url+"/timers/"+id+"/elapsed/seconds")
     if r.status == 200
-  ) yield r.body.get.value.get
+  ) yield r.body.value.get
 
   def remaining(id: Int): Future[Counter] = for (
-    r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/remaining")
+    r <- jc.get[CounterResponse](url+"/timers/"+id+"/remaining")
     if r.status == 200
-  ) yield r.body.get.value.get
+  ) yield r.body.value.get
 
   def remainingDays(id: Int): Future[Counter] = for (
-    r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/remaining/days")
+    r <- jc.get[CounterResponse](url+"/timers/"+id+"/remaining/days")
     if r.status == 200
-  ) yield r.body.get.value.get
+  ) yield r.body.value.get
 
   def remainingSeconds(id: Int): Future[Counter] = for (
-    r <- jc.get[ApiResponse[Counter]](url+"/timers/"+id+"/remaining/seconds")
+    r <- jc.get[CounterResponse](url+"/timers/"+id+"/remaining/seconds")
     if r.status == 200
-  ) yield r.body.get.value.get
+  ) yield r.body.value.get
 
 
 
