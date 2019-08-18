@@ -11,13 +11,13 @@ service ZeroService {
 
     rpc CreateTimer (ZNewTimer) returns (ZTimer) {}
     rpc GetTimer (ZTimerRequest) returns (ZTimerResponse) {}
-    rpc GetCounter (ZCounterRequest) returns (ZCounter) {}
+    rpc GetCounter (ZCounterRequest) returns (ZCounterResponse) {}
     rpc ListTimers (ZSearchRequest) returns (ZTimerResponse) {}
 
 
 }
 
-enum ZCounters {
+enum ZCounterType {
     FULL = 0;
     YEARS = 1;
     MONTHS = 2;
@@ -61,7 +61,12 @@ message ZNewTimer {
 message ZCounterRequest {
     string uuid = 1;
     bool remaining = 2;
-    ZCounters counters = 3;
+    ZCounterType counterType = 3;
+}
+
+message ZCounterResponse {
+    ZCounter counter = 1;
+    ZCounterType counterType = 2;
 }
 
 message ZCounter {

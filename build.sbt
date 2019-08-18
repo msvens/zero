@@ -3,7 +3,7 @@ import sbt.Keys._
 import sbt._
 
 lazy val buildSettings = Seq(
-  version := "0.2-SNAPSHOT",
+  version := "0.3-SNAPSHOT",
   organization := "org.mellowtech",
   scalaVersion := "2.13.0",
   publishArtifact in Test := false,
@@ -73,6 +73,6 @@ lazy val commons = (project in file ("commons")).
 lazy val root = (project in file (".")).aggregate(commons,server,client).
   settings(buildSettings: _*).
   settings(
-    publish := false
+    publish / skip := true
   )
 

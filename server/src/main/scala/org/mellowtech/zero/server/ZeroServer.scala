@@ -11,7 +11,9 @@ import akka.http.scaladsl.HttpConnectionContext
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.{ActorMaterializer, Materializer}
 import com.typesafe.config.ConfigFactory
+import io.grpc.Status
 import org.mellowtech.zero.grpc._
+import org.mellowtech.zero.model.Timer
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.io.StdIn
@@ -119,15 +121,28 @@ class ZeroServiceImpl(timerDAO: TimerDAO)(implicit mat: Materializer) extends Ze
       Future.failed(new Exception("Unimplemented criteria"))
   }
 
-  override def getCounter(in: ZCounterRequest): Future[ZCounter] = {
+  override def getCounter(in: ZCounterRequest): Future[ZCounterResponse] = {
     import org.mellowtech.zero.util.TimerFuncs._
-    val units = toUnits(in.counters)
+
+    def counter(t: Timer, ct: ZCounterType, remaining: Boolean): ZCounterResponse = {
+      import akka.grpc.GrpcServiceException
+      try {
+        ZCounterResponse(Some(zcounter(t, toUnits(ct), remaining)), ct)
+      } catch {
+        case iae: IllegalArgumentException =>
+          throw new GrpcServiceException(Status.INVALID_ARGUMENT.withDescription("To and From are not correct"))
+        case e: Exception =>
+          throw new GrpcServiceException(Status.INTERNAL.withDescription("Error calculating counter"))
+      }
+
+    }
+    val ct = in.counterType
+    //val units = toUnits(ct)
     val timer = timerDAO.get(UUID.fromString(in.uuid))
     timer.map {
-      case None => ZCounter()
-      case Some(t) => in.remaining match {
-        case true => zremaining(t, units)
-        case false => zelapsed(t, units)
+      case None => ZCounterResponse(None,ct)
+      case Some(t) => {
+        counter(t, ct, in.remaining)
       }
     }
   }

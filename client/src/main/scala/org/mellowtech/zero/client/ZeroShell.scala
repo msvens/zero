@@ -1,9 +1,13 @@
 package org.mellowtech.zero.client
 import java.time.OffsetDateTime
+import java.util.UUID
+import java.util.regex.Pattern
 
 import org.mellowtech.zero.model.AddTimer
 import org.rogach.scallop.exceptions.{Help, ScallopException, ScallopResult, Version}
 import org.rogach.scallop.{ScallopConf, Subcommand, throwError}
+
+import scala.concurrent.Future
 
 
 class ShellConf(arguments: Seq[String]) extends ScallopConf(arguments) {
@@ -22,7 +26,7 @@ class ShellConf(arguments: Seq[String]) extends ScallopConf(arguments) {
   }
 
   val elapsed = new Subcommand("elapsed"){
-    val format = opt[Char](name = "format", descr = "d (days), s (seconds) f (full)")
+    val format = opt[String](name = "format", descr = "format f (full) mo (months) d (days) h (hours) m (minutes) s (seconds) mi (millis)")
     val id = opt[String]("id", descr = "timer id")
     val name = opt[String]("name", descr = "timer title")
     val index = opt[Int](name = "index", descr = "list index")
@@ -30,7 +34,7 @@ class ShellConf(arguments: Seq[String]) extends ScallopConf(arguments) {
   }
 
   val remaining = new Subcommand("remaining"){
-    val format = opt[Char](name = "format", descr = "d (days), s (seconds) f (full)")
+    val format = opt[String](name = "format", descr = "format f (full) mo (months) d (days) h (hours) m (minutes) s (seconds) mi (millis)")
     val id = opt[String]("id", descr = "timer id")
     val name = opt[String]("name", descr = "timer title")
     val index = opt[Int](name = "index", descr = "list index")
@@ -102,6 +106,23 @@ class ZeroShell(c: ZClient) {
 
   var currentUrl: Option[String] = None
 
+
+  def sync[A](f: Future[A]): A = {
+    Await.result(f, 2.seconds)
+  }
+
+  def ready[A](f: Future[A]): Unit = {
+    val r = Await.ready(f, 2.seconds).value.get
+    r match {
+      case Success(a) => println(a)
+      case Failure(e) => println(e)
+    }
+  }
+
+  //def printCounter(c: Counter)
+
+
+
   def exec(conf: ShellConf): Unit = {
     conf.subcommand match {
       case None => conf.printHelp()
@@ -111,16 +132,42 @@ class ZeroShell(c: ZClient) {
           val m = conf.add.millis.getOrElse(1000*3600*24)
           val duration: Either[OffsetDateTime, Long] = Right(m)
           val n = OffsetDateTime.now()
-          val timer = Await.result(c.addTimer(t,OffsetDateTime.now(),duration), 2.seconds)
+          val timer = sync(c.addTimer(t,OffsetDateTime.now(),duration))
+          //val timer = Await.result(c.addTimer(t,OffsetDateTime.now(),duration), 2.seconds)
           println(timer)
         }
+        case conf.get => {
+          val uuid = conf.get.id
+          val title = conf.get.name
+          val index = conf.get.index
+          if(uuid.isDefined){
+            val timer = sync(c.getTimer(UUID.fromString(uuid())))
+            println(timer)
+          } else
+            println("currently not implemented")
+        }
         case conf.exit => {
-          c.close
+          val result = Await.result(c.close, 5.seconds)
+          println(result)
           sys.exit(0)
         } //should signal in a better way...i.e. return a flag
         case conf.set => {
           //if(conf.set.url.isDefined) c.url = conf.set.url()
           Console.println("currently disabled")
+        }
+        case conf.elapsed => {
+          if(conf.elapsed.id.isDefined){
+            val result = sync(c.counter(UUID.fromString(conf.elapsed.id()), false))
+            println(result)
+          } else
+            Console.println("currently disabled")
+        }
+        case conf.remaining => {
+          if(conf.remaining.id.isDefined){
+            ready(c.counter(UUID.fromString(conf.remaining.id()), true))
+            //println(result)
+          } else
+            Console.println("currently disabled")
         }
         case conf.list => {
           val tl = Await.ready(c.list, 2.seconds).value.get
@@ -146,9 +193,11 @@ object ZeroApp extends App {
   val c = new ZClient("localhost", 9010)
   val shell = new ZeroShell(c)
 
+  val regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'")
+
   while(true){
     Console.print("zero> ")
-    val cmd = scala.io.StdIn.readLine().split("\\s+")
+    val cmd = stringSplitter(scala.io.StdIn.readLine())
     val conf = new ShellConf(cmd)
     try {
       conf.verify()
@@ -157,5 +206,22 @@ object ZeroApp extends App {
       shell.exec(conf)
   }
   throw new Exception("should not happen")
+
+  def stringSplitter(str: String): Seq[String] = {
+    var ret: Seq[String] = Seq()
+    val matcher = regex.matcher(str)
+    while(matcher.find()){
+      if(matcher.group(1) != null) {
+        ret = ret :+ matcher.group(1)
+      }
+      else if(matcher.group(2) != null) {
+        ret = ret :+ matcher.group(2)
+      }
+      else {
+        ret = ret :+ matcher.group()
+      }
+    }
+    ret
+  }
 
 }
