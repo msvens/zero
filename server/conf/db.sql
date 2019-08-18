@@ -1,43 +1,29 @@
--- Database: timerdb
+-- Table: public.ztimer
 
--- DROP DATABASE timerdb;
+-- DROP TABLE public.ztimer;
 
-CREATE DATABASE timerdb
-    WITH
-    OWNER = timer
-    ENCODING = 'UTF8'
-    LC_COLLATE = 'C'
-    LC_CTYPE = 'UTF-8'
-    TABLESPACE = pg_default
-    CONNECTION LIMIT = -1;
-
--- Table: public.timer
-
--- DROP TABLE public.timer;
-
-CREATE TABLE public.timer
+CREATE TABLE public.ztimer
 (
-    id uuid NOT NULL,
-    name character varying(256) COLLATE pg_catalog."default" NOT NULL,
-    start timestamp without time zone NOT NULL,
-    stop timestamp without time zone,
-    zoneid character varying(256) COLLATE pg_catalog."default" NOT NULL,
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    title character varying(256) COLLATE pg_catalog."default" NOT NULL,
+    start character varying COLLATE pg_catalog."default" NOT NULL,
+    stop character varying COLLATE pg_catalog."default" NOT NULL,
     description text COLLATE pg_catalog."default",
-    CONSTRAINT timer_pkey PRIMARY KEY (id)
+    CONSTRAINT ztimer_pkey PRIMARY KEY (id)
 )
     WITH (
         OIDS = FALSE
     )
     TABLESPACE pg_default;
 
-ALTER TABLE public.timer
+ALTER TABLE public.ztimer
     OWNER to timer;
 
--- Index: nameIdx
+-- Index: title_idx
 
--- DROP INDEX public."nameIdx";
+-- DROP INDEX public.title_idx;
 
-CREATE INDEX "nameIdx"
-    ON public.timer USING btree
-        (name COLLATE pg_catalog."default")
+CREATE INDEX title_idx
+    ON public.ztimer USING btree
+        (title COLLATE pg_catalog."default")
     TABLESPACE pg_default;
