@@ -2,9 +2,6 @@ package org.mellowtech.zero.model
 
 import java.time.{Instant, LocalDateTime, OffsetDateTime, ZoneId, ZoneOffset}
 import java.util.UUID
-
-import com.github.plokhotnyuk.jsoniter_scala.core._
-import com.github.plokhotnyuk.jsoniter_scala.macros._
 import org.mellowtech.zero.grpc.{ZCounter, ZCounterType, ZTimer}
 
 
