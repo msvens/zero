@@ -13,8 +13,10 @@ service ZeroService {
     rpc GetTimer (ZTimerRequest) returns (ZTimerResponse) {}
     rpc GetCounter (ZCounterRequest) returns (ZCounterResponse) {}
     rpc ListTimers (ZSearchRequest) returns (ZTimerResponse) {}
-
-
+    rpc AddSplit (ZNewSplit) returns (ZSplit) {}
+    rpc GetSplits (ZSplitRequest) returns (ZSplitResponse) {}
+    rpc CreateUser (ZNewUser) returns (ZUser) {}
+    rpc GetUser (ZUserRequest) returns (ZUser) {}
 }
 
 enum ZCounterType {
@@ -32,7 +34,7 @@ message ZSearchRequest {}
 
 message ZTimerRequest {
     oneof critera {
-        string uuid = 1;
+        int64 id = 1;
         string title = 2;
         string desc = 3;
     }
@@ -42,24 +44,71 @@ message ZTimerResponse {
     repeated ZTimer timer = 1;
 }
 
+//Instant on the timeline in UTC
+message ZInstant {
+    int64 seconds = 1; //epoch seconds
+    int32 nanos = 2; //nanos from the start ot the second
+}
+
+message ZSplit {
+    int64 id = 1;
+    int64 timer = 2;
+    ZInstant time = 3; //if not defined an Instant will be generated in server
+    string description = 4;
+}
+
+message ZNewSplit {
+    int64 timer = 1;
+    ZInstant time = 2;
+    string description = 3;
+}
+
+message ZSplitRequest {
+    int64 timer = 1;
+}
+
+message ZSplitResponse {
+    repeated ZSplit split = 1;
+}
+
 message ZTimer {
-    string uuid = 1;
+    int64 id = 1;
     string title = 2;
-    string start = 3; //ISO-8601 extended offset date-time format
-    string stop = 4; //ISO-8601 extended offset date-time format
-    string desc = 5;
+    ZInstant start = 3;
+    ZInstant stop = 4;
+    string zone = 5;
+    string desc = 6;
 }
 
 message ZNewTimer {
     string title = 1;
-    string start = 2; //ISO-8601 extended offset date-time format
-    string stop = 3; //ISO-8601 extended offset date-time format
-    int64 millis = 4;
-    string desc = 5;
+    int64 user = 2;
+    ZInstant start = 3;
+    oneof duration {
+        ZInstant stop = 4;
+        int64 millis = 5;
+    }
+    string zoneId = 6;
+    string desc = 7;
+}
+
+message ZNewUser {
+    string username = 1;
+    string email = 2;
+}
+
+message ZUserRequest {
+    string username = 1;
+}
+
+message ZUser {
+    int64 id = 1;
+    string username = 2;
+    string email = 3;
 }
 
 message ZCounterRequest {
-    string uuid = 1;
+    int64 id = 1;
     bool remaining = 2;
     ZCounterType counterType = 3;
 }
@@ -78,6 +127,8 @@ message ZCounter {
     int64 seconds = 6;
     int64 millis = 7;
 }
+
+
 
 
 

@@ -1,9 +1,6 @@
 package org.mellowtech.zero.client
-import java.time.OffsetDateTime
-import java.util.UUID
+import java.time.Instant
 import java.util.regex.Pattern
-
-import org.mellowtech.zero.model.AddTimer
 import org.rogach.scallop.exceptions.{Help, ScallopException, ScallopResult, Version}
 import org.rogach.scallop.{ScallopConf, Subcommand, throwError}
 
@@ -19,7 +16,7 @@ class ShellConf(arguments: Seq[String]) extends ScallopConf(arguments) {
   }
 
   val get = new Subcommand("get"){
-    val id = opt[String]("id", descr = "timer id")
+    val id = opt[Long]("id", descr = "timer id")
     val name = opt[String]("name", descr = "timer title")
     val index = opt[Int](name = "index", descr = "list index")
     requireOne(id, name, index)
@@ -27,7 +24,7 @@ class ShellConf(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   val elapsed = new Subcommand("elapsed"){
     val format = opt[String](name = "format", descr = "format f (full) mo (months) d (days) h (hours) m (minutes) s (seconds) mi (millis)")
-    val id = opt[String]("id", descr = "timer id")
+    val id = opt[Long]("id", descr = "timer id")
     val name = opt[String]("name", descr = "timer title")
     val index = opt[Int](name = "index", descr = "list index")
     requireOne(id, name, index)
@@ -35,7 +32,7 @@ class ShellConf(arguments: Seq[String]) extends ScallopConf(arguments) {
 
   val remaining = new Subcommand("remaining"){
     val format = opt[String](name = "format", descr = "format f (full) mo (months) d (days) h (hours) m (minutes) s (seconds) mi (millis)")
-    val id = opt[String]("id", descr = "timer id")
+    val id = opt[Long]("id", descr = "timer id")
     val name = opt[String]("name", descr = "timer title")
     val index = opt[Int](name = "index", descr = "list index")
     requireOne(id, name, index)
@@ -130,18 +127,18 @@ class ZeroShell(c: ZClient) {
         case conf.add => {
           val t = conf.add.title()
           val m = conf.add.millis.getOrElse(1000*3600*24)
-          val duration: Either[OffsetDateTime, Long] = Right(m)
-          val n = OffsetDateTime.now()
-          val timer = sync(c.addTimer(t,OffsetDateTime.now(),duration))
-          //val timer = Await.result(c.addTimer(t,OffsetDateTime.now(),duration), 2.seconds)
+          val duration: Either[Instant, Long] = Right(m)
+          val n = Instant.now()
+          val timer = sync(c.addTimer(t,Instant.now(),duration))
           println(timer)
         }
         case conf.get => {
-          val uuid = conf.get.id
+          val id = conf.get.id
           val title = conf.get.name
           val index = conf.get.index
-          if(uuid.isDefined){
-            val timer = sync(c.getTimer(UUID.fromString(uuid())))
+          if(id.isDefined){
+            val timer = sync(c.getTimer(id()))
+            //val timer = sync(c.getTimer(UUID.fromString(uuid())))
             println(timer)
           } else
             println("currently not implemented")
@@ -157,14 +154,14 @@ class ZeroShell(c: ZClient) {
         }
         case conf.elapsed => {
           if(conf.elapsed.id.isDefined){
-            val result = sync(c.counter(UUID.fromString(conf.elapsed.id()), false))
+            val result = sync(c.counter(conf.elapsed.id(), false))
             println(result)
           } else
             Console.println("currently disabled")
         }
         case conf.remaining => {
           if(conf.remaining.id.isDefined){
-            ready(c.counter(UUID.fromString(conf.remaining.id()), true))
+            ready(c.counter(conf.remaining.id(), true))
             //println(result)
           } else
             Console.println("currently disabled")
@@ -188,9 +185,7 @@ object ZeroApp extends App {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  Console.print("Welcome, Enter Query Uri: ")
-  val uri = Console.in.readLine()
-  val c = new ZClient("localhost", 9010)
+  val c = new ZClient("localhost", 9090)
   val shell = new ZeroShell(c)
 
   val regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'")

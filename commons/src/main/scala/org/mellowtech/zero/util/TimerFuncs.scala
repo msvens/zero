@@ -12,10 +12,11 @@ import org.mellowtech.zero.model.{Counter, Timer}
   */
 object TimerFuncs {
 
+  /*
   def utcNow: OffsetDateTime = OffsetDateTime.now(ZoneOffset.UTC)
   def split(odt: OffsetDateTime): (Instant,ZoneId) = (odt.toInstant(), odt.getOffset)
   def merge(i: Instant, z: ZoneId): OffsetDateTime = OffsetDateTime.ofInstant(i, z)
-
+  */
 
   val yearUnits: List[ChronoUnit] = List(ChronoUnit.YEARS,ChronoUnit.MONTHS,ChronoUnit.DAYS,ChronoUnit.HOURS,ChronoUnit.MINUTES,ChronoUnit.SECONDS, ChronoUnit.MILLIS)
   val monthUnits:  List[ChronoUnit] = List(ChronoUnit.MONTHS, ChronoUnit.DAYS,ChronoUnit.HOURS,ChronoUnit.MINUTES,ChronoUnit.SECONDS, ChronoUnit.MILLIS)
@@ -36,56 +37,37 @@ object TimerFuncs {
     case _ => yearUnits
   }
 
-  def elapsedSeconds(t: Timer): Counter = elapsed(t, List(ChronoUnit.SECONDS))
-  def elapsedToDays(t: Timer): Counter = elapsed(t, dayUnits)
-  def elapsedFull(t: Timer): Counter = elapsed(t, yearUnits)
-  def elapsed(t: Timer, units: List[ChronoUnit]): Counter = {
-    counter(t.start, OffsetDateTime.now(t.stop.getOffset), units)
+  def counter(t: Timer, units: List[ChronoUnit], remaining: Boolean = false): Counter = remaining match {
+    case false => elapsedTime(t, units)
+    case true => remainingTime(t, units)
   }
 
-  def remainingSeconds(t: Timer): Counter = remaining(t, List(ChronoUnit.SECONDS))
-  def remainingToDays(t: Timer): Counter = remaining(t, dayUnits)
-  def remainingFull(t: Timer): Counter = remaining(t, yearUnits)
-  def remaining(t: Timer, units: List[ChronoUnit]): Counter = {
-    counter(OffsetDateTime.now(t.start.getOffset), t.stop, units)
+  def elapsedTime(t: Timer, units: List[ChronoUnit]): Counter = {
+    counterCalc(t.start, Instant.now(), units)
   }
 
-
-  def counter(from: OffsetDateTime, to: OffsetDateTime, units: List[ChronoUnit]): Counter = {
-    require(from.isBefore(to))
-    val ca = calcExtendedDuration(from, to, units)
-    Counter(years = ca.get(ChronoUnit.YEARS), months = ca.get(ChronoUnit.MONTHS), days = ca.get(ChronoUnit.DAYS),
-      hours = ca.get(ChronoUnit.HOURS), minutes = ca.get(ChronoUnit.MINUTES), seconds = ca.get(ChronoUnit.SECONDS))
+  def remainingTime(t: Timer, units: List[ChronoUnit]): Counter = {
+    counterCalc(Instant.now(), t.stop, units)
   }
 
-  def zcounter(t: Timer, units: List[ChronoUnit], remaining: Boolean = false): ZCounter = remaining match {
-    case false => zelapsed(t, units)
-    case true => zremaining(t, units)
-  }
-
-  def zelapsed(t: Timer, units: List[ChronoUnit]): ZCounter = {
-    zcounterCalc(t.start, OffsetDateTime.now(t.stop.getOffset), units)
-  }
-
-  def zremaining(t: Timer, units: List[ChronoUnit]): ZCounter = {
-    zcounterCalc(OffsetDateTime.now(t.start.getOffset), t.stop, units)
-  }
-
-  private def zcounterCalc(from: OffsetDateTime, to: OffsetDateTime, units: List[ChronoUnit]): ZCounter = {
+  def counterCalc(from: Instant, to: Instant, units: List[ChronoUnit]): Counter = {
     require(from.isBefore(to), "From is After To")
-    val ca = calcExtendedDuration(from, to, units)
-    ZCounter(years = ca.getOrElse(ChronoUnit.YEARS, 0),
-      months = ca.getOrElse(ChronoUnit.MONTHS, 0),
-      days = ca.getOrElse(ChronoUnit.DAYS, 0),
-      hours = ca.getOrElse(ChronoUnit.HOURS,0),
-      minutes = ca.getOrElse(ChronoUnit.MINUTES, 0),
-      seconds = ca.getOrElse(ChronoUnit.SECONDS,0),
-      millis = ca.getOrElse(ChronoUnit.MILLIS, 0))
+    require(units != Nil)
+    val ca = calcExtendedDuration(from.atOffset(ZoneOffset.UTC), to.atOffset(ZoneOffset.UTC), units)
+    Counter(years = ca.get(ChronoUnit.YEARS),
+      months = ca.get(ChronoUnit.MONTHS),
+      days = ca.get(ChronoUnit.DAYS),
+      hours = ca.get(ChronoUnit.HOURS),
+      minutes = ca.get(ChronoUnit.MINUTES),
+      seconds = ca.get(ChronoUnit.SECONDS),
+      millis = ca.get(ChronoUnit.MILLIS))
   }
 
 
-
-
+  /**
+   * Needs to be on OffsetDateTime since instant cant handle units larger than days since that depends
+   * on the time offset
+   */
   def calcExtendedDuration(from: OffsetDateTime, to: OffsetDateTime, units: List[ChronoUnit]): Map[ChronoUnit,Long] =  units match{
     case Nil => Map()
     case h :: tail => {
@@ -93,5 +75,16 @@ object TimerFuncs {
       calcExtendedDuration(from.plus(amount,h),to,tail) + ((h,amount))
     }
   }
+
+
+  /*
+  def calcExtendedDuration(from: Instant, to: Instant, units: List[ChronoUnit]): Map[ChronoUnit,Long] =  units match{
+    case Nil => Map()
+    case h :: tail => {
+      val amount = from.until(to, h)
+      calcExtendedDuration(from.plus(amount,h),to,tail) + ((h,amount))
+    }
+  }
+   */
 
 }
