@@ -3,9 +3,10 @@ package org.mellowtech.zero.model
 import java.time.{Instant, ZoneId, ZoneOffset}
 
 import org.mellowtech.zero.grpc.{ZCounterType, ZInstant}
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class GrpcConvertersSpec extends FlatSpec with Matchers{
+class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
 
   import GrpcConverts._
 

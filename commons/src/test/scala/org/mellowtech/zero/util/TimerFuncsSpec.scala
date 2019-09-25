@@ -3,9 +3,10 @@ package org.mellowtech.zero.util
 import java.time.{Instant, ZoneOffset}
 import java.time.temporal.ChronoUnit
 
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.flatspec.AnyFlatSpec
+import org.scalatest.matchers.should.Matchers
 
-class TimerFuncsSpecs extends FlatSpec with Matchers{
+class TimerFuncsSpec extends AnyFlatSpec with Matchers{
 
   import TimerFuncs._
 
