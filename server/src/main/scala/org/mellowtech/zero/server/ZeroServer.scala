@@ -1,6 +1,6 @@
 package org.mellowtech.zero.server
 
-import java.time.{Instant, ZoneId}
+import java.time.Instant
 
 import akka.actor.{ActorSystem, Terminated}
 import akka.event.{Logging, LoggingAdapter}
@@ -10,10 +10,9 @@ import akka.http.scaladsl.HttpConnectionContext
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.{ActorMaterializer, Materializer}
 import io.grpc.Status
+import org.mellowtech.zero.db.TimerDAO
 import org.mellowtech.zero.grpc._
 import org.mellowtech.zero.model.Timer
-import slick.basic.DatabaseConfig
-import slick.jdbc.JdbcProfile
 
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.io.StdIn
@@ -23,7 +22,7 @@ object ZeroGrpcServer extends App {
   implicit val actorSystem: ActorSystem = ActorSystem("GrpcServer")
 
   implicit val materializer: ActorMaterializer = ActorMaterializer()
-  val timerDAO = new TimerDAO(DatabaseConfig.forConfig[JdbcProfile]("pg_dc"))(actorSystem.dispatcher)
+  val timerDAO = TimerDAO("pg_dc")(actorSystem.dispatcher)
 
   val server = new ZeroGrpcServer(timerDAO)
   println("server started!")
@@ -71,7 +70,7 @@ class ZeroServiceImpl(timerDAO: TimerDAO)(implicit mat: Materializer) extends Ze
   import mat.executionContext
   import org.mellowtech.zero.model.GrpcConverts._
 
-  override def createTimer(in: ZNewTimer): Future[ZTimer] = {
+  override def addTimer(in: AddTimerRequest): Future[AddTimerResponse] = {
 
     if(in.title == "") {
       Future.failed(new GrpcServiceException(Status.INVALID_ARGUMENT.withDescription("title cannot be empty")))
@@ -85,39 +84,39 @@ class ZeroServiceImpl(timerDAO: TimerDAO)(implicit mat: Materializer) extends Ze
 
       for {
         tt <- timerDAO.addTimer(user, in.title, start, duration, zone, description)
-      } yield toZTimer(tt)
+      } yield AddTimerResponse(Some(toTimerItem(tt)))
     }
   }
 
-  override def getTimer(in: ZTimerRequest): Future[ZTimerResponse] = {
-    if(in.critera.isId){
-      val id = in.critera.id.get
-      timerDAO.get(id).map {
-        case Some(t) => {
-          ZTimerResponse(Seq(toZTimer(t)))
-        }
-        case None => ZTimerResponse()
-      }
-    } else if(in.critera.isTitle) {
-      timerDAO.get(in.critera.title.get).map {
-        case Some(t) => ZTimerResponse(Seq(toZTimer(t)))
-        case None => ZTimerResponse()
-      }
-    } else
-      Future.failed(new Exception("Unimplemented criteria"))
+  override def getTimerById(in: GetTimerByIdRequest): Future[GetTimerResponse] = {
+    timerDAO.getTimer(in.id).map {
+      case Some(t) => GetTimerResponse(Seq(toTimerItem(t)))
+      case None => GetTimerResponse()
+    }
   }
 
-  override def listTimers(in: ZSearchRequest): Future[ZTimerResponse] = for {
-    timers <- timerDAO.list
-  } yield ZTimerResponse(timers.map(toZTimer(_)))
+  override def getTimerByName(in: GetTimerByNameRequest): Future[GetTimerResponse] = {
+    timerDAO.getTimerByTitle(in.name).map {
+      case Some(t) => GetTimerResponse(Seq(toTimerItem(t)))
+      case None => GetTimerResponse()
+    }
+  }
 
-  override def getCounter(in: ZCounterRequest): Future[ZCounterResponse] = {
+  override def getTimerByUser(in: GetTimerByUserRequest): Future[GetTimerResponse] = for {
+    timers <- timerDAO.getTimersByUser(in.userId)
+  } yield GetTimerResponse(timers.map(toTimerItem))
+
+  override def listTimers(in: ListTimersRequest): Future[ListTimersResponse] = for {
+    timers <- timerDAO.listTimers()
+  } yield ListTimersResponse(timers.map(toTimerItem))
+
+  override def getCounter(in: GetCounterRequest): Future[GetCounterResponse] = {
     import org.mellowtech.zero.util.TimerFuncs._
 
-    def ctr(t: Timer, ct: ZCounterType, remaining: Boolean): ZCounterResponse = {
+    def ctr(t: Timer, ct: CounterType, remaining: Boolean): GetCounterResponse = {
       try {
         val c = counter(t, toUnits(ct), remaining)
-        ZCounterResponse(Some(toZCounter(c)), ct)
+        GetCounterResponse(Some(toCounterItem(c)), ct)
       } catch {
         case iae: IllegalArgumentException =>
           throw new GrpcServiceException(Status.INVALID_ARGUMENT.withDescription("To and From are not correct"))
@@ -128,36 +127,49 @@ class ZeroServiceImpl(timerDAO: TimerDAO)(implicit mat: Materializer) extends Ze
     }
     val ct = in.counterType
     //val units = toUnits(ct)
-    val timer = timerDAO.get(in.id)
+    val timer = timerDAO.getTimer(in.timerId)
     timer.map {
-      case None => ZCounterResponse(None,ct)
-      case Some(t) => {
-        ctr(t, ct, in.remaining)
-      }
+      case None => GetCounterResponse(None,ct)
+      case Some(t) => ctr(t, ct, in.remaining)
     }
   }
 
-  override def addSplit(in: ZNewSplit): Future[ZSplit] = {
-    val instant = in.time.isDefined match {
-      case true => toInstant(in.time.get)
-      case false => Instant.now()
+  override def addSplit(in: AddSplitRequest): Future[AddSplitResponse] = {
+    val instant = if (in.time.isDefined) {
+      toInstant(in.time.get)
+    } else {
+      Instant.now()
     }
     val description = in.description match {
       case "" => None
       case _ => Some(in.description)
     }
-    timerDAO.addSplit(in.timer, instant, description).map(s => toZSplit(s))
+    timerDAO.addSplit(in.timer, instant, description).map(s => AddSplitResponse(Some(toSplitItem(s))))
   }
 
-  override def getSplits(in: ZSplitRequest): Future[ZSplitResponse] = for {
-    splits <- timerDAO.getSplits(in.timer)
-  } yield ZSplitResponse(splits.map(toZSplit(_)))
+  override def getSplit(in: GetSplitRequest): Future[GetSplitResponse] = for {
+    splits <- timerDAO.getSplits(in.timerId)
+  } yield GetSplitResponse(splits.map(toSplitItem))
 
-  override def createUser(in: ZNewUser): Future[ZUser] = {
-    ???
+  override def addUser(in: AddUserRequest): Future[AddUserResponse] = for {
+    user <- timerDAO.addUser(in.username, in.email, None)
+  } yield AddUserResponse(Some(toUserItem(user)))
+
+  override def getUserById(in: GetUserByIdRequest): Future[GetUserResponse] = {
+    timerDAO.getUser(in.id).map {
+      case Some(u) => GetUserResponse(Some(toUserItem(u)))
+      case None => GetUserResponse(None)
+    }
   }
 
-  override def getUser(in: ZUserRequest): Future[ZUser] = {
-    ???
+  override def getUserByName(in: GetUserByNameRequest): Future[GetUserResponse] = {
+    timerDAO.getUserByName(in.name).map {
+      case Some(u) => GetUserResponse(Some(toUserItem(u)))
+      case None => GetUserResponse(None)
+    }
   }
+
+  override def listUsers(in: ListUsersRequest): Future[ListUsersResponse] = for {
+    users <- timerDAO.listUsers()
+  } yield ListUsersResponse(users.map(toUserItem))
 }

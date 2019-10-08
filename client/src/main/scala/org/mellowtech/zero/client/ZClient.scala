@@ -5,7 +5,8 @@ import java.time.{Clock, Instant}
 import akka.actor.{ActorSystem, Terminated}
 import akka.grpc.GrpcClientSettings
 import akka.stream.ActorMaterializer
-import org.mellowtech.zero.grpc.{ZCounterRequest, ZCounterType, ZNewSplit, ZNewTimer, ZSearchRequest, ZSplitRequest, ZTimerRequest, ZeroService, ZeroServiceClient}
+import org.mellowtech.zero.grpc.CounterType._
+import org.mellowtech.zero.grpc.{AddSplitRequest, AddTimerRequest, GetCounterRequest, GetSplitRequest, GetTimerByIdRequest, ListTimersRequest, ZeroService, ZeroServiceClient}
 import org.mellowtech.zero.model.{Counter, Split, Timer}
 
 import scala.concurrent.Future
@@ -26,41 +27,39 @@ class ZClient(host: String, port: Int) {
 
   def list: Future[Seq[Timer]] = {
     for {
-      timers <- client.listTimers(ZSearchRequest())
-    } yield timers.timer.map(toTimer)
+      timers <- client.listTimers(ListTimersRequest())
+    } yield timers.timers.map(toTimer)
   }
 
   def counter(id: Long, remaining: Boolean = false): Future[Counter] = {
-    getCounter(ZCounterRequest(id, remaining, ZCounterType.YEARS))
+    getCounter(GetCounterRequest(id, remaining, YEARS))
   }
 
   def millis(id: Long, remaining: Boolean = false): Future[Counter] = {
-    getCounter(ZCounterRequest(id, true, ZCounterType.MILLIS))
+    getCounter(GetCounterRequest(id, true, MILLIS))
   }
 
   def seconds(id: Long, remaining: Boolean = false): Future[Counter] = {
-    getCounter(ZCounterRequest(id, true, ZCounterType.SECONDS))
+    getCounter(GetCounterRequest(id, true, SECONDS))
   }
 
   def minutes(id: Long, remaining: Boolean = false): Future[Counter] = {
-    getCounter(ZCounterRequest(id, true, ZCounterType.MINUTES))
+    getCounter(GetCounterRequest(id, true, MINUTES))
   }
 
   def hours(id: Long, remaining: Boolean = false): Future[Counter] = {
-    getCounter(ZCounterRequest(id, true, ZCounterType.HOURS))
+    getCounter(GetCounterRequest(id, true, HOURS))
   }
 
   def days(id: Long, remaining: Boolean = false): Future[Counter] = {
-    getCounter(ZCounterRequest(id, true, ZCounterType.DAYS))
+    getCounter(GetCounterRequest(id, true, DAYS))
   }
 
-  def months(id: Long, remaining: Boolean = false): Future[Counter] = {
-    getCounter(ZCounterRequest(id, true, ZCounterType.MONTHS))
-  }
+  def months(id: Long, remaining: Boolean = false): Future[Counter] = getCounter(GetCounterRequest(id, true, MONTHS))
 
-  private def getCounter(req: ZCounterRequest): Future[Counter] = {
+  private def getCounter(req: GetCounterRequest): Future[Counter] = {
     client.getCounter(req).map(resp => {
-      if(resp.counter.isEmpty) throw new Exception("No Timer with that ID "+req.id)
+      if(resp.counter.isEmpty) throw new Exception("No Timer with that ID "+req.timerId)
       else toCounter(resp.counter.get, resp.counterType)
     })
   }
@@ -69,32 +68,28 @@ class ZClient(host: String, port: Int) {
                description: String = ""): Future[Timer] = {
     require(name != null && name.length > 0)
     val d = duration match {
-      case Left(x) => ZNewTimer.Duration.Stop(toZInstant(x))
-      case Right(x) => ZNewTimer.Duration.Millis(x)
+      case Left(x) => AddTimerRequest.Duration.Stop(toZInstant(x))
+      case Right(x) => AddTimerRequest.Duration.Millis(x)
     }
-    val req = ZNewTimer(title = name, start = Some(toZInstant(start)), duration = d, zoneId = clock.getZone.getId, desc = description)
-    client.createTimer(req).map(toTimer(_))
+    val req = AddTimerRequest(title = name, start = Some(toZInstant(start)), duration = d, zoneId = clock.getZone.getId, desc = description)
+    client.addTimer(req).map(resp => {toTimer(resp.getTimer)})
   }
 
   def addSplit(id: Long, description: String = ""): Future[Split] = {
-    val req = ZNewSplit(timer = id, description = description)
-    client.addSplit(req).map(toSplit(_))
+    val req = AddSplitRequest(timer = id, description = description)
+    client.addSplit(req).map(resp => {toSplit(resp.getSplit)})
   }
 
   def getSplits(timer: Long): Future[Seq[Split]] = for{
-    resp <- client.getSplits(ZSplitRequest(timer))
-  } yield resp.split.map(toSplit(_))
+    resp <- client.getSplit(GetSplitRequest(timer))
+  } yield resp.splits.map(toSplit)
 
   def getTimer(id: Long): Future[Timer] = {
-    import org.mellowtech.zero.grpc.ZTimerRequest.Critera.Id
-    val req = ZTimerRequest(Id(id))
-    val resp: Future[Timer] = client.getTimer(req).map(x => {
-      if(x.timer.isEmpty)
-        throw new Exception("no such user")
+    client.getTimerById(GetTimerByIdRequest(id)).map(resp => {
+      if(resp.timers.isEmpty) throw new Exception("no such user")
       else
-        toTimer(x.timer(0))
+        toTimer(resp.timers.head)
     })
-    resp
   }
 
 

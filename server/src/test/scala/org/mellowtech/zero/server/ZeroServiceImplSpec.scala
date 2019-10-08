@@ -2,15 +2,14 @@ package org.mellowtech.zero.server
 
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
-import org.mellowtech.zero.grpc.{ZNewTimer, ZSearchRequest, ZTimer, ZTimerRequest}
+import org.mellowtech.zero.db.TimerDAO
+import org.mellowtech.zero.grpc.{AddTimerRequest, GetTimerByIdRequest, ListTimersRequest, TimerItem}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
 import org.scalatest.{Assertion, BeforeAndAfter, BeforeAndAfterAll}
-import slick.basic.DatabaseConfig
-import slick.jdbc.JdbcProfile
 
 class ZeroServiceImplSpec extends AsyncFlatSpec with Matchers with BeforeAndAfter with BeforeAndAfterAll {
 
@@ -18,24 +17,12 @@ class ZeroServiceImplSpec extends AsyncFlatSpec with Matchers with BeforeAndAfte
   var timerDAO: TimerDAO = _
 
   val system: ActorSystem = ActorSystem("ZeroServiceSystem")
-  val mat = ActorMaterializer.create(system)
+  val mat: ActorMaterializer = ActorMaterializer.create(system)
 
-  //val timerDAO = new TimerDAO(DatabaseConfig.forConfig[JdbcProfile]("h2mem_server_dc"))
-
-  //val service = new ZeroServiceImpl(timerDAO)
   var service: ZeroServiceImpl = _
 
-  /*
-  override def beforeAll(): Unit = {
-    timerDAO = new TimerDAO(DatabaseConfig.forConfig[JdbcProfile]("h2mem_server_dc"))
-    timerDAO.createTablesSynced()
-    service = new ZeroServiceImpl(timerDAO)(mat)
-  }
-  */
-
-
   before {
-    timerDAO = new TimerDAO(DatabaseConfig.forConfig[JdbcProfile]("h2mem_server_dc"))
+    timerDAO = TimerDAO("h2mem_server_dc")
     timerDAO.createTablesSynced()
     service = new ZeroServiceImpl(timerDAO)(mat)
   }
@@ -49,38 +36,38 @@ class ZeroServiceImplSpec extends AsyncFlatSpec with Matchers with BeforeAndAfte
     Await.ready(system.terminate(), 5.seconds)
   }
 
-  def newZTimer(): ZNewTimer = {
-    ZNewTimer(title = "timer", start = None, zoneId = "UTC", duration = ZNewTimer.Duration.Millis(36000), desc = "description")
+  def newTimerItem(): AddTimerRequest = {
+    AddTimerRequest(title = "timer", start = None, zoneId = "UTC", duration = AddTimerRequest.Duration.Millis(36000), desc = "description")
   }
 
-  def assertDefaultTimer(zt: ZTimer): Assertion = {
-    assert(zt.title == "timer")
-    assert(zt.desc == "description")
+  def assertDefaultTimer(ti: TimerItem): Assertion = {
+    assert(ti.title == "timer")
+    assert(ti.desc == "description")
   }
 
   behavior of "ZeroServiceImpl"
 
   it should "create a new timer" in {
-    service.createTimer(newZTimer()).map(assertDefaultTimer(_))
+    service.addTimer(newTimerItem()).map(resp => {assertDefaultTimer(resp.getTimer)})
   }
 
   it should "retrieve a timer" in {
     for {
-      t <- service.createTimer(newZTimer())
-      tt <- service.getTimer(ZTimerRequest(ZTimerRequest.Critera.Id(t.id)))
+      t <- service.addTimer(newTimerItem())
+      tt <- service.getTimerById(GetTimerByIdRequest(t.getTimer.id))
     } yield {
-      assert(tt.timer.size == 1)
-      assertDefaultTimer(tt.timer.head)
+      assert(tt.timers.size == 1)
+      assertDefaultTimer(tt.timers.head)
     }
   }
 
   it should "list all timers" in {
     for {
-      t <- service.createTimer(newZTimer())
-      tt <- service.createTimer(newZTimer())
-      timers <- service.listTimers(ZSearchRequest())
+      _ <- service.addTimer(newTimerItem())
+      _ <- service.addTimer(newTimerItem())
+      timers <- service.listTimers(ListTimersRequest())
     } yield {
-      assert(timers.timer.size >= 2)
+      assert(timers.timers.size == 2)
     }
   }
 

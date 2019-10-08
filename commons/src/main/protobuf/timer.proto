@@ -8,19 +8,24 @@ package zero;
 
 service ZeroService {
 
+    rpc AddSplit (AddSplitRequest) returns (AddSplitResponse) {}
+    rpc AddTimer (AddTimerRequest) returns (AddTimerResponse) {}
+    rpc AddUser (AddUserRequest) returns (AddUserResponse) {}
+    rpc GetCounter (GetCounterRequest) returns (GetCounterResponse) {}
+    rpc GetSplit (GetSplitRequest) returns (GetSplitResponse) {}
+    rpc GetTimerById (GetTimerByIdRequest) returns (GetTimerResponse) {}
+    rpc GetTimerByName (GetTimerByNameRequest) returns (GetTimerResponse) {}
+    rpc GetTimerByUser (GetTimerByUserRequest) returns (GetTimerResponse) {}
+    rpc GetUserById (GetUserByIdRequest) returns (GetUserResponse) {}
+    rpc GetUserByName (GetUserByNameRequest) returns (GetUserResponse) {}
+    rpc ListTimers (ListTimersRequest) returns (ListTimersResponse) {}
+    rpc ListUsers (ListUsersRequest) returns (ListUsersResponse) {}
 
-    rpc CreateTimer (ZNewTimer) returns (ZTimer) {}
-    rpc GetTimer (ZTimerRequest) returns (ZTimerResponse) {}
-    rpc GetCounter (ZCounterRequest) returns (ZCounterResponse) {}
-    rpc ListTimers (ZSearchRequest) returns (ZTimerResponse) {}
-    rpc AddSplit (ZNewSplit) returns (ZSplit) {}
-    rpc GetSplits (ZSplitRequest) returns (ZSplitResponse) {}
-    rpc CreateUser (ZNewUser) returns (ZUser) {}
-    rpc GetUser (ZUserRequest) returns (ZUser) {}
+
 }
 
-enum ZCounterType {
-    FULL = 0;
+enum CounterType {
+    FULL = 0; //default counter type
     YEARS = 1;
     MONTHS = 2;
     DAYS = 3;
@@ -30,48 +35,56 @@ enum ZCounterType {
     MILLIS = 7;
 }
 
-message ZSearchRequest {}
-
-message ZTimerRequest {
-    oneof critera {
-        int64 id = 1;
-        string title = 2;
-        string desc = 3;
-    }
-}
-
-message ZTimerResponse {
-    repeated ZTimer timer = 1;
-}
-
 //Instant on the timeline in UTC
 message ZInstant {
     int64 seconds = 1; //epoch seconds
     int32 nanos = 2; //nanos from the start ot the second
 }
 
-message ZSplit {
+message CounterItem {
+    int64 years = 1;
+    int64 months = 2;
+    int64 days = 3;
+    int64 hours = 4;
+    int64 minutes = 5;
+    int64 seconds = 6;
+    int64 millis = 7;
+}
+message GetCounterRequest {
+    int64 timerId = 1;
+    bool remaining = 2;
+    CounterType counterType = 3;
+}
+message GetCounterResponse {
+    CounterItem counter = 1;
+    CounterType counterType = 2;
+}
+
+
+message SplitItem {
     int64 id = 1;
     int64 timer = 2;
     ZInstant time = 3; //if not defined an Instant will be generated in server
     string description = 4;
 }
-
-message ZNewSplit {
+message AddSplitRequest {
     int64 timer = 1;
     ZInstant time = 2;
     string description = 3;
 }
-
-message ZSplitRequest {
-    int64 timer = 1;
+message AddSplitResponse {
+    SplitItem split = 1;
+}
+message GetSplitRequest {
+    int64 timerId = 1;
+}
+message GetSplitResponse {
+    repeated SplitItem splits = 1;
 }
 
-message ZSplitResponse {
-    repeated ZSplit split = 1;
-}
 
-message ZTimer {
+
+message TimerItem {
     int64 id = 1;
     string title = 2;
     ZInstant start = 3;
@@ -79,8 +92,7 @@ message ZTimer {
     string zone = 5;
     string desc = 6;
 }
-
-message ZNewTimer {
+message AddTimerRequest {
     string title = 1;
     int64 user = 2;
     ZInstant start = 3;
@@ -91,42 +103,60 @@ message ZNewTimer {
     string zoneId = 6;
     string desc = 7;
 }
+message AddTimerResponse {
+    TimerItem timer = 1;
+}
+message GetTimerByIdRequest {
+    int64 id = 1;
+}
+message GetTimerByNameRequest {
+    string name = 1;
+}
+message GetTimerByUserRequest {
+    int64 userId = 1;
+}
+message GetTimerResponse {
+    repeated TimerItem timers = 1;
+}
+message ListTimersRequest {
 
-message ZNewUser {
-    string username = 1;
-    string email = 2;
+}
+message ListTimersResponse {
+    repeated TimerItem timers = 1;
 }
 
-message ZUserRequest {
-    string username = 1;
-}
 
-message ZUser {
+
+message UserItem {
     int64 id = 1;
     string username = 2;
     string email = 3;
 }
-
-message ZCounterRequest {
+message AddUserRequest {
+    string username = 1;
+    string email = 2;
+}
+message AddUserResponse {
+    UserItem user = 1;
+}
+message GetUserByIdRequest {
     int64 id = 1;
-    bool remaining = 2;
-    ZCounterType counterType = 3;
+}
+message GetUserByNameRequest {
+    string name = 1;
+}
+message GetUserResponse {
+    UserItem user = 1;
+}
+message ListUsersRequest {
+
+}
+message ListUsersResponse {
+    repeated UserItem users = 1;
 }
 
-message ZCounterResponse {
-    ZCounter counter = 1;
-    ZCounterType counterType = 2;
-}
 
-message ZCounter {
-    int64 years = 1;
-    int64 months = 2;
-    int64 days = 3;
-    int64 hours = 4;
-    int64 minutes = 5;
-    int64 seconds = 6;
-    int64 millis = 7;
-}
+
 
 
 

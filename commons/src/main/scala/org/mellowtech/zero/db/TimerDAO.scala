@@ -1,4 +1,4 @@
-package org.mellowtech.zero.server
+package org.mellowtech.zero.db
 
 import java.time.temporal.ChronoUnit
 import java.time.{Instant, ZoneId}
@@ -16,6 +16,11 @@ import scala.concurrent.{Await, ExecutionContext, Future}
   * @since 01/10/16
   */
 
+object TimerDAO {
+  def apply(dbConfig: String)(implicit ec: ExecutionContext): TimerDAO = {
+    new TimerDAO(DatabaseConfig.forConfig[JdbcProfile](dbConfig))
+  }
+}
 
 class TimerDAO(protected val config: DatabaseConfig[JdbcProfile])(implicit ec: ExecutionContext){
 
@@ -32,7 +37,8 @@ class TimerDAO(protected val config: DatabaseConfig[JdbcProfile])(implicit ec: E
     def id: Rep[Long] = column[Long]("id", O.PrimaryKey)
     def username: Rep[String] = column[String]("username", O.Unique)
     def email: Rep[String] = column[String]("email", O.SqlType("VARCHAR(256)"))
-    def * = (id, username, email) <>(User.tupled, User.unapply)
+    def token = column[Option[String]]("token")
+    def * = (id, username, email, token) <>(User.tupled, User.unapply)
   }
 
   class TimerTable(tag: Tag) extends Table[Timer](tag, "timer"){
@@ -50,13 +56,13 @@ class TimerDAO(protected val config: DatabaseConfig[JdbcProfile])(implicit ec: E
     def zone = column[ZoneId]("timezone")
     def description = column[Option[String]]("description")
 
-    def titleIdx = index("idx_title", (title), unique = false)
+    def userfk = foreignKey("fk_user", user, users)(_.id, onUpdate=ForeignKeyAction.NoAction, onDelete=ForeignKeyAction.Cascade)
+
+    def titleIdx = index("idx_title", title, unique = false)
 
     def * = (id, user, title, start, stop, zone, description) <> (Timer.tupled, Timer.unapply)
 
   }
-
-
 
   class SplitTable(tag: Tag) extends Table[Split](tag, "split"){
 
@@ -64,7 +70,9 @@ class TimerDAO(protected val config: DatabaseConfig[JdbcProfile])(implicit ec: E
     def timer = column[Long]("timer")
     def stamp = column[Instant]("stamp")
     def description = column[Option[String]]("description")
+
     def timerfk = foreignKey("fk_timer", timer, timers)(_.id, onUpdate=ForeignKeyAction.NoAction, onDelete=ForeignKeyAction.Cascade)
+
 
     def * = (id, timer, stamp, description) <> (Split.tupled, Split.unapply)
 
@@ -114,27 +122,21 @@ class TimerDAO(protected val config: DatabaseConfig[JdbcProfile])(implicit ec: E
     db.run(splits.size.result)
   }
 
+  def usersSize(): Future[Int] = {
+    db.run(users.size.result)
+  }
+
 
   def addSplit(timer: Long, time: Instant, description: Option[String] = None): Future[Split] = {
     addSplit(Split(splitIdGenerator.nextId(), timer, time, description))
   }
 
   private def addSplit(s: Split): Future[Split] = {
-    config.db.run(splits += s).map(_ => s)
-  }
-
-  def deleteSplit(id: Long): Future[Int] = {
-    val q = splits.filter(_.id === id)
-    db.run(q.delete)
-  }
-
-  def getSplits(timerId: Long): Future[Seq[Split]] = {
-    val q = splits.filter(_.timer === timerId)
-    config.db.run(q.result)
+    db.run(splits += s).map(_ => s)
   }
 
   def addTimer(user: Option[Long], title: String, start: Instant, duration: Either[Instant, Long],
-             zone: ZoneId, description: Option[String] = None): Future[Timer] = {
+               zone: ZoneId, description: Option[String] = None): Future[Timer] = {
     val stop = duration match {
       case Left(x) => x
       case Right(x) => start.plus(x, ChronoUnit.MILLIS)
@@ -142,28 +144,73 @@ class TimerDAO(protected val config: DatabaseConfig[JdbcProfile])(implicit ec: E
     addTimer(Timer(timerIdGenerator.nextId(), user, title, start, stop, zone, description))
   }
 
+  private[db] def addTimer(t: Timer): Future[Timer] = for {
+    _ <- Future(require(t.stop.isAfter(t.start)), "Stop is not after start")
+    cols: Int <- db.run(timers += t)
+  } yield t
+
+  def addUser(username: String, email: String, token: Option[String]): Future[User] = {
+    addUser(User(userIdGenerator.nextId(), username, email, token))
+  }
+
+  private def addUser(u: User): Future[User] = {
+    db.run(users += u).map(_ => u)
+  }
+
+  def deleteSplit(id: Long): Future[Int] = {
+    val q = splits.filter(_.id === id)
+    db.run(q.delete)
+  }
+
   def deleteTimer(id: Long): Future[Int] = {
-    //db.run(timers.size)
     val q = timers.filter(_.id === id)
     db.run(q.delete)
   }
 
-  private[server] def addTimer(t: Timer): Future[Timer] = for {
-      _ <- Future(require(t.stop.isAfter(t.start)), "Stop is not after start")
-      cols: Int <- db.run(timers += t)
-    } yield t
+  def deleteUser(id: Long): Future[Int] = {
+    val q = users.filter(_.id === id)
+    db.run(q.delete)
+  }
 
-  def get(id: Long): Future[Option[Timer]] = {
+  def getSplits(timerId: Long): Future[Seq[Split]] = {
+    val q = splits.filter(_.timer === timerId)
+    db.run(q.result)
+  }
+
+  def getUser(id: Long): Future[Option[User]] = {
+    val q = users.filter(_.id === id)
+    db.run(q.result.headOption)
+  }
+
+  def getUserByName(name: String): Future[Option[User]] = {
+    db.run(users.filter(_.username === name).result.headOption)
+  }
+
+  def getUserByEmail(email: String): Future[Option[User]] = {
+    db.run(users.filter(_.email === email).result.headOption)
+  }
+
+  def getTimer(id: Long): Future[Option[Timer]] = {
     db.run(timerByIdCompiled(id).result.headOption)
   }
 
-  def get(title: String): Future[Option[Timer]] = {
+  def getTimerByTitle(title: String): Future[Option[Timer]] = {
     val q = timers.filter(_.title === title)
     db.run(q.result.headOption)
   }
 
-  def list(): Future[Seq[Timer]] = {
+  def getTimersByUser(id: Long): Future[Seq[Timer]] = {
+    val q = timers.filter(_.user === id)
+    db.run(q.result)
+  }
+
+  def listTimers(): Future[Seq[Timer]] = {
     val q = for(t <- timers) yield t
+    db.run(q.result)
+  }
+
+  def listUsers(): Future[Seq[User]] = {
+    val q = for(u <- users) yield u
     db.run(q.result)
   }
 

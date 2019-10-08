@@ -3,11 +3,11 @@ package org.mellowtech.zero.model
 import java.time.{Instant, ZoneId}
 import java.util.UUID
 
-import org.mellowtech.zero.grpc.{ZCounter, ZCounterType, ZInstant, ZNewTimer, ZSplit, ZTimer}
+import org.mellowtech.zero.grpc.{AddTimerRequest, CounterItem, CounterType, SplitItem, TimerItem, UserItem, ZInstant}
 
 case class Split(id: Long, timer: Long, time: Instant, description: Option[String] = None)
 
-case class User(id: Long, username: String, email: String)
+case class User(id: Long, username: String, email: String, token: Option[String])
 
 case class Timer(id: Long,
                  user: Option[Long],
@@ -63,7 +63,7 @@ object GrpcConverts {
   def fromOption(a: Option[Array[Byte]]): Array[Byte] = a.getOrElse(Array())
 
 
-  def toSplit(zs: ZSplit): Split = {
+  def toSplit(zs: SplitItem): Split = {
     val instant = zs.time.isDefined match {
       case true => toInstant(zs.time.get)
       case false => Instant.now()
@@ -71,7 +71,7 @@ object GrpcConverts {
     Split(zs.id, zs.timer, instant, toOption(zs.description))
   }
 
-  def toZSplit(s: Split): ZSplit = ZSplit(
+  def toSplitItem(s: Split): SplitItem = SplitItem(
     id = s.id, timer = s.timer,
     time = Some(toZInstant(s.time)), description = fromOption(s.description)
   )
@@ -81,13 +81,13 @@ object GrpcConverts {
 
   def toZInstant(i: Instant): ZInstant = ZInstant(i.getEpochSecond, i.getNano)
 
-  def toTimer(zt: ZTimer): Timer = toTimer(zt, None)
-  def toTimer(zt: ZTimer, user: Option[Long]): Timer = Timer(zt.id, user, zt.title, toInstant(zt.start.get), toInstant(zt.stop.get),
+  def toTimer(zt: TimerItem): Timer = toTimer(zt, None)
+  def toTimer(zt: TimerItem, user: Option[Long]): Timer = Timer(zt.id, user, zt.title, toInstant(zt.start.get), toInstant(zt.stop.get),
     ZoneId.of(zt.zone), toOption(zt.desc))
 
 
-  def toZCounter(c: Counter): ZCounter = {
-    ZCounter(
+  def toCounterItem(c: Counter): CounterItem = {
+    CounterItem(
       years = c.years.getOrElse(0),
       months = c.months.getOrElse(0),
       days = c.days.getOrElse(0),
@@ -97,31 +97,31 @@ object GrpcConverts {
       millis = c.millis.getOrElse(0))
   }
 
-  def toCounter(zc: ZCounter, ct: ZCounterType): Counter = ct match {
-    case ZCounterType.MILLIS => Counter(millis = Some(zc.millis))
-    case ZCounterType.SECONDS => Counter(
+  def toCounter(zc: CounterItem, ct: CounterType): Counter = ct match {
+    case CounterType.MILLIS => Counter(millis = Some(zc.millis))
+    case CounterType.SECONDS => Counter(
       seconds = Some(zc.seconds),
       millis = Some(zc.millis)
     )
-    case ZCounterType.MINUTES => Counter(
+    case CounterType.MINUTES => Counter(
       minutes = Some(zc.minutes),
       seconds = Some(zc.seconds),
       millis = Some(zc.millis)
     )
-    case ZCounterType.HOURS => Counter(
+    case CounterType.HOURS => Counter(
       hours = Some(zc.hours),
       minutes = Some(zc.minutes),
       seconds = Some(zc.seconds),
       millis = Some(zc.millis)
     )
-    case ZCounterType.DAYS => Counter(
+    case CounterType.DAYS => Counter(
       days = Some(zc.days),
       hours = Some(zc.hours),
       minutes = Some(zc.minutes),
       seconds = Some(zc.seconds),
       millis = Some(zc.millis)
     )
-    case ZCounterType.MONTHS => Counter(
+    case CounterType.MONTHS => Counter(
       months = Some(zc.months),
       days = Some(zc.days),
       hours = Some(zc.hours),
@@ -140,7 +140,22 @@ object GrpcConverts {
     )
   }
 
-  def parseDuration(z: ZNewTimer): Either[Instant, Long] = {
+  def toTimerItem(t: Option[Timer]): TimerItem = t match {
+    case Some(x) => toTimerItem(x)
+    case None => TimerItem()
+  }
+
+  def toTimerItem(t: Timer): TimerItem = {
+    val desc = t.description.getOrElse("")
+    TimerItem(t.id, t.title, Some(toZInstant(t.start)), Some(toZInstant(t.stop)),
+      t.zone.getId, desc)
+  }
+
+  def toUserItem(u: User): UserItem = {
+    UserItem(u.id, u.username, u.email)
+  }
+
+  def parseDuration(z: AddTimerRequest): Either[Instant, Long] = {
     if(z.duration.isEmpty)
       Right(1000*3600*24)
     else if(z.duration.isMillis)
@@ -149,24 +164,13 @@ object GrpcConverts {
       Left(toInstant(z.duration.stop.get))
   }
 
-  def parseZoneId(z: ZNewTimer): ZoneId = z.zoneId match {
+  def parseZoneId(z: AddTimerRequest): ZoneId = z.zoneId match {
     case "" => ZoneId.of("UTC")
     case _ => ZoneId.of(z.zoneId)
   }
 
-  def parseStart(z: ZNewTimer): Instant = {
+  def parseStart(z: AddTimerRequest): Instant = {
     if (z.start.isDefined) toInstant(z.start.get)
     else Instant.now()
-  }
-
-  def toZTimer(t: Option[Timer]): ZTimer = t match {
-    case Some(x) => toZTimer(x)
-    case None => ZTimer()
-  }
-
-  def toZTimer(t: Timer): ZTimer = {
-    val desc = t.description.getOrElse("")
-    ZTimer(t.id, t.title, Some(toZInstant(t.start)), Some(toZInstant(t.stop)),
-      t.zone.getId, desc)
   }
 }

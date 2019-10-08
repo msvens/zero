@@ -2,7 +2,7 @@ package org.mellowtech.zero.model
 
 import java.time.{Instant, ZoneId, ZoneOffset}
 
-import org.mellowtech.zero.grpc.{ZCounterType, ZInstant}
+import org.mellowtech.zero.grpc.{CounterType, ZInstant}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
@@ -29,7 +29,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   behavior of "grpc converts"
 
   it should "convert a Split to ZSplit" in {
-    val zs = toZSplit(split)
+    val zs = toSplitItem(split)
     assert(zs.description == "description")
     assert(zs.timer == 1)
     assert(zs.id == 1)
@@ -37,7 +37,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   }
 
   it should "convert a Split with an empty description to ZSplit" in {
-    val zs = toZSplit(splitEmpty)
+    val zs = toSplitItem(splitEmpty)
     assert(zs.id == 1)
     assert(zs.timer == 1)
     compareInstant(start, zs.time.get)
@@ -45,7 +45,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   }
 
   it should "convert a ZSplit to Split" in {
-    val s = toSplit(toZSplit(split))
+    val s = toSplit(toSplitItem(split))
     assert(s.id == split.id)
     assert(s.timer == split.timer)
     assert(s.time == split.time)
@@ -53,7 +53,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   }
 
   it should "convert a ZSplit with an empty description to Split" in {
-    val s = toSplit(toZSplit(splitEmpty))
+    val s = toSplit(toSplitItem(splitEmpty))
     assert(s.id == splitEmpty.id)
     assert(s.timer == splitEmpty.timer)
     assert(s.time == splitEmpty.time)
@@ -61,7 +61,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   }
 
   it should "convert a Counter to ZCounter" in {
-    val zc = toZCounter(counter)
+    val zc = toCounterItem(counter)
     assert(zc.years == 1)
     assert(zc.months == 1)
     assert(zc.days == 0)
@@ -72,7 +72,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   }
 
   it should "convert a ZCounter to Counter" in {
-    val c = toCounter(toZCounter(counter), ZCounterType.YEARS)
+    val c = toCounter(toCounterItem(counter), CounterType.YEARS)
     assert(c.years.get == 1)
     assert(c.months.get == 1)
     assert(c.days.get == 0) //Observe when specifying the counter type Years all converted values will Some(xxx)
@@ -83,7 +83,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   }
 
   it should "convert a ZCounter minutes to Counter" in {
-    val c = toCounter(toZCounter(minuteCounter), ZCounterType.MINUTES)
+    val c = toCounter(toCounterItem(minuteCounter), CounterType.MINUTES)
     assert(c.years == None)
     assert(c.months == None)
     assert(c.days == None)
@@ -105,7 +105,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   }
 
   it should "convert a timer to ztimer" in {
-    val zt = toZTimer(timer)
+    val zt = toTimerItem(timer)
     assert(zt.id == timer.id)
     assert(zt.title == timer.title)
     compareInstant(start, zt.start.get)
@@ -115,7 +115,7 @@ class GrpcConvertersSpec extends AnyFlatSpec with Matchers{
   }
 
   it should "convert a ztimer to timer" in {
-    val t = toTimer(toZTimer(timer))
+    val t = toTimer(toTimerItem(timer))
     assert(timer.id == t.id)
     assert(timer.title == t.title)
     assert(start == t.start)

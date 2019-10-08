@@ -57,6 +57,6 @@ object Dependencies {
   //module dependencies:
   val serverDependcies = akkaDeps ++ testDeps ++ dbDeps ++ Seq(logbackClassic)
   val clientDependcies = akkaDeps ++ testDeps ++ Seq(scallop, logbackClassic)
-  val commonsDependcies = testDeps
+  val commonsDependcies = testDeps ++ dbDeps
 
 }

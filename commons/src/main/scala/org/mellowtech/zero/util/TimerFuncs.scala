@@ -3,7 +3,7 @@ package org.mellowtech.zero.util
 import java.time.{Instant, OffsetDateTime, ZoneId, ZoneOffset}
 import java.time.temporal.ChronoUnit
 
-import org.mellowtech.zero.grpc.{ZCounter, ZCounterType}
+import org.mellowtech.zero.grpc.{CounterItem, CounterType}
 import org.mellowtech.zero.model.{Counter, Timer}
 
 /**
@@ -26,14 +26,14 @@ object TimerFuncs {
   val secondUnits: List[ChronoUnit] = List(ChronoUnit.SECONDS, ChronoUnit.MILLIS)
   val milliUnits: List[ChronoUnit] = List(ChronoUnit.MILLIS)
 
-  def toUnits(counterType: ZCounterType): List[ChronoUnit]  = counterType match {
-    case ZCounterType.YEARS => yearUnits
-    case ZCounterType.MONTHS => monthUnits
-    case ZCounterType.DAYS => dayUnits
-    case ZCounterType.HOURS => hourUnits
-    case ZCounterType.MINUTES => minuteUnits
-    case ZCounterType.SECONDS => secondUnits
-    case ZCounterType.MILLIS => milliUnits
+  def toUnits(counterType: CounterType): List[ChronoUnit]  = counterType match {
+    case CounterType.YEARS => yearUnits
+    case CounterType.MONTHS => monthUnits
+    case CounterType.DAYS => dayUnits
+    case CounterType.HOURS => hourUnits
+    case CounterType.MINUTES => minuteUnits
+    case CounterType.SECONDS => secondUnits
+    case CounterType.MILLIS => milliUnits
     case _ => yearUnits
   }
 

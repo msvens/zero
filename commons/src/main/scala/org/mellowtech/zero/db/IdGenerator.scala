@@ -1,5 +1,4 @@
-package org.mellowtech.zero.server
-
+package org.mellowtech.zero.db
 
 /**
  * Generates *unique* identifiers. There are *no* other requirements (e.g. randomness) as to the returned values.
