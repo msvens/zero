@@ -15,7 +15,7 @@ object Dependencies {
   //val hikariCpVersion = "3.3.1"
   val slickVersion = "3.3.2"
   val postgresqlVersion = "42.2.6"
-  val idGeneratorVersion = "1.2.0"
+  val idGeneratorVersion = "1.2.1"
 
   val akkaHttpVersion = "10.1.9"
   val akkaVersion = "2.5.24"
@@ -44,8 +44,8 @@ object Dependencies {
   val slickCodegen = "com.typesafe.slick" %% "slick-codegen" % slickVersion
   val slickHikariCp = "com.typesafe.slick" %% "slick-hikaricp" % slickVersion
   val postgresql = "org.postgresql" % "postgresql" % postgresqlVersion
-  //val idGenerator = "com.softwaremill.common" %% "id-generator" % idGeneratorVersion
-  val dbDeps = Seq(postgresql, slick, slickCodegen, slickHikariCp)
+  val idGenerator = "com.softwaremill.common" %% "id-generator" % idGeneratorVersion
+  val dbDeps = Seq(postgresql, slick, slickCodegen, slickHikariCp, idGenerator)
 
   //protobuf
   //val scalapbRuntime = "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"

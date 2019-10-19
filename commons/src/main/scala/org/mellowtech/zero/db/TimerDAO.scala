@@ -3,6 +3,7 @@ package org.mellowtech.zero.db
 import java.time.temporal.ChronoUnit
 import java.time.{Instant, ZoneId}
 
+import com.softwaremill.id.DefaultIdGenerator
 import org.mellowtech.zero.model.{Split, Timer, User}
 import slick.basic.DatabaseConfig
 import slick.jdbc.JdbcProfile
